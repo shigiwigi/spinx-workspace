@@ -18,22 +18,10 @@ export function XMark({ size = 20, strokeWidth = 4, color = C.gold }) {
 
 /** Placeholder lockup for the real SpinX logo image. Drop the uploaded
  *  file at src/assets/spinx-logo.jpeg and swap the div below for
- *  <img src={logo} className="w-full h-full object-contain" />. */
+ *  . */
 export function LogoMark({ size = 34 }) {
   return (
-    <div
-      className="flex items-center justify-center shrink-0"
-      style={{
-        width: size,
-        height: size,
-        background: C.surface3,
-        border: `1px solid ${C.goldLine}`,
-        ...clipCorner(6, ["tr"]),
-      }}
-      title="SpinX logo — replace with /assets/spinx-logo.jpeg"
-    >
-      <XMark size={size * 0.55} strokeWidth={4.5} />
-    </div>
+    <img src={logo} className="w-full h-full object-contain" />
   );
 }
 
