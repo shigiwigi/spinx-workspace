@@ -1,240 +1,179 @@
-import React, { useState, useEffect } from "react";
-import { Search, Bell, ChevronRight, ChevronLeft, Sparkles, LogOut, Award, Users } from "lucide-react";
-import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
-import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
-import { db, auth, googleProvider } from "./firebase";
-import { C, useFonts } from "./theme";
-import { Avatar, XMark, PrimaryBtn, Badge, Card } from "./components/Primitives";
-import { NAV } from "./data";
+import React, { useState } from "react";
+import { CheckCircle2, ThumbsUp, AlertCircle, FileText } from "lucide-react";
+import { doc, updateDoc, collection, addDoc, increment } from "firebase/firestore";
+import { db } from "../../firebase";
+import { C, clipCorner } from "../../theme";
+import { SectionHeader, Badge, Card } from "../Primitives";
 
-import { Dashboard } from "./components/views/Dashboard";
-import { Meetings } from "./components/views/Meetings";
-import { Notices } from "./components/views/Notices";
-import { Finance } from "./components/views/Finance";
-import { Inventory } from "./components/views/Inventory";
-import { Projects } from "./components/views/Projects";
-import { Team } from "./components/views/Team";
-import { Documentation } from "./components/views/Documentation";
-import { Procurement } from "./components/views/Procurement";
-import { Analytics } from "./components/views/Analytics";
-import { AIFeatures } from "./components/views/AIFeatures";
+export function Projects({ liveTasks = { todo: [], progress: [], done: [], completed: [] }, userRole, userId, allMembers = [] }) {
+  const [dragId, setDragId] = useState(null);
+  const [dragFrom, setDragFrom] = useState(null);
+  const [draft, setDraft] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("GENERAL TASKS");
+  const [selectedAssignee, setSelectedAssignee] = useState(userId);
+  const [reviewPoints, setReviewPoints] = useState({});
+  const [reviewFeedback, setReviewFeedback] = useState({});
 
-export default function SpinXWorkspace() {
-  useFonts();
-  const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState({ role: "Presenter", points: 0 });
-  const [allUsers, setAllUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [active, setActive] = useState("dashboard");
-  const [collapsed, setCollapsed] = useState(false);
+  const categories = ["REVIEW", "GENERAL TASKS", "Bonus Structure"];
+  const cols = [
+    { key: "todo", label: "To Do" }, 
+    { key: "progress", label: "In Progress" }, 
+    { key: "done", label: "Done (Reviewing)" },
+    { key: "completed", label: "Completed" }
+  ];
 
-  const [meetings, setMeetings] = useState([]);
-  const [notices, setNotices] = useState([]);
-  const [expenses, setExpenses] = useState([]);
-  const [inventory, setInventory] = useState([]);
-  const [tasks, setTasks] = useState({ todo: [], progress: [], done: [], completed: [] });
-  const [team, setTeam] = useState([]);
-  const [docs, setDocs] = useState([]);
-  const [procurement, setProcurement] = useState([]);
+  const onDrop = async (colKey) => {
+    if (dragId == null || dragFrom == null || dragFrom === colKey) return;
+    if (colKey === "completed") return; 
+    if (["Presenter", "Media", "Operations"].includes(userRole)) return;
 
-  useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        const uDocRef = doc(db, "users", currentUser.uid);
-        const uSnap = await getDoc(uDocRef);
-        
-        if (uSnap.exists()) {
-          setProfile(uSnap.data());
-        } else {
-          const initialData = {
-            uid: currentUser.uid,
-            name: currentUser.displayName || "Anonymous",
-            email: currentUser.email,
-            role: currentUser.email === "shigiwigi@gmail.com" ? "Head Developer" : "Presenter", 
-            points: 0,
-            createdAt: new Date()
-          };
-          await setDoc(uDocRef, initialData);
-          setProfile(initialData);
-        }
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
+    await updateDoc(doc(db, "tasks", dragId), { status: colKey });
+    setDragId(null); setDragFrom(null);
+  };
+
+  const createTask = async () => {
+    if (!draft.trim()) return;
+    
+    const targetAssignee = allMembers.find(m => m.id === selectedAssignee) || { name: "Unassigned" };
+
+    await addDoc(collection(db, "tasks"), {
+      title: draft,
+      category: selectedCategory,
+      assignedToId: selectedAssignee,
+      assignedToName: targetAssignee.name,
+      status: "todo",
+      pointsValue: 0, 
+      feedback: "",
+      createdAt: new Date()
     });
-    return () => unsubscribeAuth();
-  }, []);
+    setDraft("");
+  };
 
-  useEffect(() => {
-    if (!user) return;
+  const finalizeTaskByOwner = async (taskId, workerId) => {
+    if (userRole !== "Owner") return;
+    
+    const allocatedPoints = Number(reviewPoints[taskId]) || 0;
+    const feedbackText = reviewFeedback[taskId] || "Task accepted successfully.";
 
-    // Stream all authenticated site members dynamically
-    const unsubUsers = onSnapshot(collection(db, "users"), (s) => {
-      setAllUsers(s.docs.map(d => ({ id: d.id, ...d.data() })));
+    // 1. Mark task complete with dynamic points and justification text
+    await updateDoc(doc(db, "tasks", taskId), { 
+      status: "completed",
+      pointsValue: allocatedPoints,
+      feedback: feedbackText
     });
 
-    const unsubTasks = onSnapshot(query(collection(db, "tasks"), orderBy("createdAt", "desc")), (s) => {
-      const all = s.docs.map(d => ({ id: d.id, ...d.data() }));
-      setTasks({
-        todo: all.filter(t => t.status === "todo"),
-        progress: all.filter(t => t.status === "progress"),
-        done: all.filter(t => t.status === "done"),
-        completed: all.filter(t => t.status === "completed")
+    // 2. Increment score index only if target worker profile is not the Owner
+    const workerDoc = allMembers.find(m => m.id === workerId);
+    if (workerDoc && workerDoc.role !== "Owner") {
+      await updateDoc(doc(db, "users", workerId), {
+        points: increment(allocatedPoints)
       });
-    });
-
-    const unsubMeetings = onSnapshot(query(collection(db, "meetings"), orderBy("createdAt", "desc")), (s) => setMeetings(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubNotices = onSnapshot(query(collection(db, "notices"), orderBy("createdAt", "desc")), (s) => setNotices(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubExpenses = onSnapshot(query(collection(db, "expenses"), orderBy("createdAt", "desc")), (s) => setExpenses(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubInventory = onSnapshot(query(collection(db, "inventory"), orderBy("createdAt", "desc")), (s) => setInventory(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubTeam = onSnapshot(query(collection(db, "team"), orderBy("createdAt", "asc")), (s) => setTeam(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubDocs = onSnapshot(query(collection(db, "documentation"), orderBy("createdAt", "asc")), (s) => setDocs(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubProcure = onSnapshot(query(collection(db, "procurement"), orderBy("createdAt", "desc")), (s) => setProcurement(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-
-    return () => {
-      unsubUsers(); unsubMeetings(); unsubNotices(); unsubExpenses(); 
-      unsubInventory(); unsubTasks(); unsubTeam(); unsubDocs(); unsubProcure();
-    };
-  }, [user]);
-
-  const handleUpdateRole = async (targetUid, newRole) => {
-    if (profile.role !== "Owner" && profile.role !== "Head Developer") return;
-    await updateDoc(doc(db, "users", targetUid), { role: newRole });
+    }
   };
-
-  const handleRedeemPoints = async () => {
-    if (profile.role === "Owner" || profile.points < 5000) return;
-    await updateDoc(doc(db, "users", user.uid), { points: 0 });
-    setProfile(prev => ({ ...prev, points: 0 }));
-    alert("₹5,000 cash payment redemption flag triggered to Owner!");
-  };
-
-  const handleLogin = async () => { try { await signInWithPopup(auth, googleProvider); } catch (e) { console.error(e); } };
-  const handleLogout = async () => { try { await signOut(auth); setActive("dashboard"); } catch (e) { console.error(e); } };
-
-  const allowedNav = NAV.filter(n => {
-    if (profile.role === "Owner" || profile.role === "Head Developer") return true;
-    if (profile.role === "Developer") return !["finance"].includes(n.id);
-    if (profile.role === "Operations") return !["finance", "docs"].includes(n.id);
-    if (profile.role === "Media") return ["dashboard", "notices", "team"].includes(n.id);
-    if (profile.role === "Presenter") return ["dashboard", "meetings", "notices"].includes(n.id);
-    return false;
-  });
 
   return (
-    <div className="flex w-full" style={{ height: "100vh", background: C.bg, fontFamily: "Inter" }}>
-      {/* SIDEBAR */}
-      <div className="flex flex-col shrink-0" style={{ width: collapsed ? 68 : 232, background: C.surface, borderRight: `1px solid ${C.border}` }}>
-        <div className="flex items-center gap-2.5 px-4 h-16 shrink-0 border-b" style={{ borderColor: C.border }}>
-          <XMark size={20} strokeWidth={4} />
-          {!collapsed && <span className="text-white font-bold text-sm tracking-wider">SPINX ENGINE</span>}
-        </div>
-
-        <div className="flex-1 py-3 px-2.5 space-y-0.5 overflow-y-auto">
-          {allowedNav.map(n => {
-            const isActive = active === n.id;
-            return (
-              <button key={n.id} onClick={() => setActive(n.id)} className="w-full flex items-center gap-3 px-2.5 py-2.5 relative text-neutral-400 hover:text-white"
-                style={{ background: isActive ? C.goldSoft : "transparent", color: isActive ? C.gold : "" }}>
-                <n.icon size={16} />
-                {!collapsed && <span className="text-sm font-semibold">{n.label}</span>}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="p-2.5 shrink-0 border-t" style={{ borderColor: C.border }}>
-          <button onClick={() => setCollapsed(!collapsed)} className="w-full text-center text-xs text-neutral-500">
-            {collapsed ? "Expand" : "Collapse menu"}
+    <div>
+      <SectionHeader title="Projects & Operations" subtitle="Track tasks, assign categories, and manage owner payouts." />
+      
+      {/* Universal Assignment Engine (Restricted to Builders) */}
+      {["Head Developer", "Developer", "Owner"].includes(userRole) && (
+        <Card className="mb-6 p-4 border border-neutral-800 bg-neutral-900">
+          <div className="text-white font-mono text-xs uppercase tracking-wider mb-3">Initialize Operation Task</div>
+          <div className="grid grid-cols-4 gap-3">
+            <input 
+              value={draft} 
+              onChange={e => setDraft(e.target.value)} 
+              placeholder="Task name or description..."
+              className="col-span-2 bg-neutral-950 border border-neutral-800 px-3 py-2 text-xs outline-none text-white font-sans"
+            />
+            <select 
+              value={selectedCategory} 
+              onChange={e => setSelectedCategory(e.target.value)}
+              className="bg-neutral-950 border border-neutral-800 px-2 py-2 text-white text-xs outline-none font-mono"
+            >
+              {categories.map((c, i) => <option key={i} value={c}>{c}</option>)}
+            </select>
+            <select 
+              value={selectedAssignee} 
+              onChange={e => setSelectedAssignee(e.target.value)}
+              className="bg-neutral-950 border border-neutral-800 px-2 py-2 text-white text-xs outline-none"
+            >
+              {allMembers.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.role})</option>)}
+            </select>
+          </div>
+          <button onClick={createTask} className="mt-3 px-4 py-2 bg-amber-500 text-black font-bold uppercase tracking-wider text-[10px] rounded hover:bg-amber-600 transition-colors">
+            Deploy Task Board
           </button>
-        </div>
-      </div>
+        </Card>
+      )}
 
-      {/* MAIN CONTAINER */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex items-center gap-4 px-6 h-16 shrink-0 border-b" style={{ borderColor: C.border, background: C.bg }}>
-          
-          {/* Dynamic Score Indicator (Hidden for Owner) */}
-          {profile.role !== "Owner" && (
-            <div className="flex items-center gap-3 bg-neutral-900 px-3 py-1.5 border border-neutral-800 rounded">
-              <Award size={14} className="text-amber-400" />
-              <div className="text-xs font-semibold text-neutral-300">
-                Score: <span className="text-white font-mono">{profile.points || 0}</span> / 5000 PTS
-              </div>
-              {profile.points >= 5000 && (
-                <button onClick={handleRedeemPoints} className="text-[10px] uppercase font-bold px-2 py-0.5 bg-amber-500 text-black rounded ml-1">
-                  Redeem ₹5k
-                </button>
-              )}
+      {/* KANBAN BOARD MATRIX LAYOUT */}
+      <div className="grid grid-cols-4 gap-4">
+        {cols.map(col => (
+          <div key={col.key} onDragOver={e => e.preventDefault()} onDrop={() => onDrop(col.key)}>
+            <div className="flex items-center justify-between mb-3 border-b border-neutral-800 pb-2 font-mono">
+              <span className="text-xs uppercase font-medium tracking-widest text-neutral-400">{col.label}</span>
+              <span className="text-xs px-2 py-0.5 bg-neutral-900 text-neutral-500 rounded font-mono">{liveTasks[col.key]?.length || 0}</span>
             </div>
-          )}
 
-          <div className="ml-auto flex items-center gap-4 text-white">
-            <Badge tone="gold">{profile.role}</Badge>
-            <button onClick={handleLogout} className="text-neutral-400 hover:text-white"><LogOut size={16} /></button>
-            <div className="flex items-center gap-2">
-              <img src={user.photoURL} className="w-8 h-8 rounded-full border border-neutral-800" alt="avatar" />
-              <div className="text-left">
-                <div className="text-xs font-bold leading-none">{user.displayName}</div>
-                <div className="text-[10px] text-neutral-500">{user.email}</div>
-              </div>
+            <div className="space-y-3 min-h-[200px] bg-neutral-950/40 p-2 border border-dashed border-neutral-900">
+              {liveTasks[col.key]?.map(t => (
+                <div key={t.id} draggable={!["completed", "done"].includes(col.key) && !["Presenter", "Media", "Operations"].includes(userRole)} 
+                  onDragStart={() => { setDragId(t.id); setDragFrom(col.key); }}
+                  className="p-3 border border-neutral-800 bg-neutral-900 relative"
+                  style={{ ...clipCorner(8) }}>
+                  
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge>{t.category || "GENERAL"}</Badge>
+                    <div className="text-[10px] text-neutral-400 font-sans">Assignee: <span className="text-white font-medium">{t.assignedToName}</span></div>
+                  </div>
+
+                  <div className="text-xs text-neutral-200 my-2 leading-relaxed" style={{ fontFamily: "Inter" }}>{t.title}</div>
+                  
+                  {/* COMPLETED CARD STATE (DISPLAY JUSTIFICATION & SCORE OUTCOME) */}
+                  {col.key === "completed" && (
+                    <div className="mt-2 pt-2 border-t border-neutral-800 text-[11px] space-y-1 font-mono">
+                      <div className="text-amber-400 font-semibold">+ {t.pointsValue || 0} SCORE POINTS</div>
+                      <div className="text-neutral-500 leading-tight font-sans italic">“ {t.feedback} ”</div>
+                    </div>
+                  )}
+
+                  {/* OWNER REVIEW DASHBOARD MATRIX */}
+                  {col.key === "done" && userRole === "Owner" && (
+                    <div className="mt-3 pt-3 border-t border-neutral-800 space-y-2">
+                      <input 
+                        type="number" 
+                        placeholder="Points (e.g., 750, 1500)" 
+                        value={reviewPoints[t.id] || ""} 
+                        onChange={e => setReviewPoints({ ...reviewPoints, [t.id]: e.target.value })}
+                        className="w-full bg-neutral-950 border border-neutral-800 px-2 py-1.5 text-xs text-white font-mono outline-none"
+                      />
+                      <textarea 
+                        placeholder="Owner evaluation justification statement..." 
+                        rows={2}
+                        value={reviewFeedback[t.id] || ""} 
+                        onChange={e => setReviewFeedback({ ...reviewFeedback, [t.id]: e.target.value })}
+                        className="w-full bg-neutral-950 border border-neutral-800 px-2 py-1.5 text-xs text-white outline-none resize-none"
+                      />
+                      <button 
+                        onClick={() => finalizeTaskByOwner(t.id, t.assignedToId)}
+                        className="w-full flex items-center justify-center gap-2 text-[10px] uppercase tracking-wider font-bold py-1.5 border border-emerald-500 text-emerald-400 bg-emerald-950/20 hover:bg-emerald-500 hover:text-black transition-all"
+                      >
+                        Sign-off Completion
+                      </button>
+                    </div>
+                  )}
+
+                  {col.key === "done" && userRole !== "Owner" && (
+                    <div className="flex items-center gap-1.5 text-[10px] font-mono text-amber-400 bg-amber-500/5 px-2 py-1 border border-amber-500/10 mt-2">
+                      <AlertCircle size={10} /> Pending Owner Evaluation
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
-        </div>
-
-        {/* Dynamic System Subview Active Router */}
-        <div className="flex-1 overflow-y-auto p-6 bg-black">
-          {active === "team" ? (
-            <div>
-              <Team liveTeam={team} />
-              
-              {/* Site Member Administrative Matrix Panel */}
-              {["Owner", "Head Developer"].includes(profile.role) && (
-                <div className="mt-8">
-                  <div className="text-white font-bold text-sm uppercase tracking-wider mb-3 font-mono">System Core Access Controls</div>
-                  <Card className="p-0 overflow-hidden border border-neutral-800">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-neutral-900 text-neutral-400 border-b border-neutral-800 font-mono">
-                          <th className="p-3">Member Name</th>
-                          <th className="p-3">Email Handle</th>
-                          <th className="p-3">Score Ledger</th>
-                          <th className="p-3">System Access Privilege</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-neutral-800 text-neutral-300">
-                        {allUsers.map((u) => (
-                          <tr key={u.id} className="hover:bg-neutral-900/50">
-                            <td className="p-3 font-semibold text-white">{u.name}</td>
-                            <td className="p-3 font-mono text-neutral-500">{u.email}</td>
-                            <td className="p-3 font-mono text-amber-400 font-semibold">{u.role === "Owner" ? "—" : `${u.points || 0} PTS`}</td>
-                            <td className="p-3">
-                              <select 
-                                value={u.role || "Presenter"}
-                                onChange={(e) => handleUpdateRole(u.id, e.target.value)}
-                                className="bg-neutral-950 border border-neutral-800 px-2 py-1 text-white text-xs outline-none"
-                              >
-                                <option value="Owner">Owner</option>
-                                <option value="Head Developer">Head Developer</option>
-                                <option value="Developer">Developer</option>
-                                <option value="Operations">Operations</option>
-                                <option value="Media">Media</option>
-                                <option value="Presenter">Presenter</option>
-                              </select>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </Card>
-                </div>
-              )}
-            </div>
-          ) : (
-            active === "projects" ? <Projects liveTasks={tasks} userRole={profile.role} userId={user.uid} allMembers={allUsers} /> : renderSection()
-          )}
-        </div>
+        ))}
       </div>
     </div>
   );
