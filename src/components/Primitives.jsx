@@ -1,33 +1,35 @@
 import React from "react";
 import { C, FONT, clipCorner } from "../theme";
+import logo from "../assets/spinx-logo.jpeg"; // Imported the uploaded asset logo
 
 /* ------------------------------------------------------------------ */
-/*  SIGNATURE MARK — a stencilled brushstroke X, standing in for the   */
-/*  uploaded SpinX logo wherever a compact mark is needed (sidebar,    */
-/*  loading states, empty states). Swap the <image> src for the real   */
-/*  logo file once it's dropped into /src/assets.                      */
+/* SIGNATURE MARK — utilizes the assets logo file.                  */
 /* ------------------------------------------------------------------ */
 export function XMark({ size = 20, strokeWidth = 4, color = C.gold }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
-      <path d="M6 6 L34 34" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
-      <path d="M34 6 L6 34" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
-    </svg>
+    <img 
+      src={logo} 
+      alt="SpinX Mark" 
+      style={{ width: size, height: size, objectFit: "contain" }} 
+    />
   );
 }
 
-/** Placeholder lockup for the real SpinX logo image. Drop the uploaded
- *  file at src/assets/spinx-logo.jpeg and swap the div below for
- *  . */
+/** Logo lockup using the real SpinX logo image asset. */
 export function LogoMark({ size = 34 }) {
   return (
-    <img src={logo} className="w-full h-full object-contain" />
+    <img 
+      src={logo} 
+      alt="SpinX Logo"
+      className="object-contain" 
+      style={{ width: size, height: size }}
+    />
   );
 }
 
 /** The recurring spray-streak watermark — one bold gesture, used sparingly
- *  as the page's signature (hero corners, empty states) rather than as
- *  scattered decoration. */
+ * as the page's signature (hero corners, empty states) rather than as
+ * scattered decoration. */
 export function SprayStreak({ size = 200, opacity = 0.05, style = {} }) {
   return (
     <svg
@@ -45,7 +47,7 @@ export function SprayStreak({ size = 200, opacity = 0.05, style = {} }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  LAYOUT PRIMITIVES                                                  */
+/* LAYOUT PRIMITIVES                                                  */
 /* ------------------------------------------------------------------ */
 
 export function Card({ children, className = "", pad = "p-5", style = {}, tag = false, ...rest }) {
@@ -113,9 +115,9 @@ export function SectionHeader({ title, subtitle, action }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  BADGES + BUTTONS                                                   */
-/* ------------------------------------------------------------------ */
+/* ---------------------------------- */
+/* BADGES + BUTTONS                 */
+/* ---------------------------------- */
 
 const TONES = {
   default: { bg: C.surface3, fg: C.textDim, bd: C.border },
@@ -187,9 +189,9 @@ export function GhostBtn({ children, icon: Icon, onClick }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  DATA DISPLAY                                                       */
-/* ------------------------------------------------------------------ */
+/* ---------------------------------- */
+/* DATA DISPLAY                     */
+/* ---------------------------------- */
 
 export function Avatar({ name = "?", size = 28 }) {
   const initials = name
