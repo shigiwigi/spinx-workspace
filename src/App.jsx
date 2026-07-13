@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Search, Bell, ChevronRight, ChevronLeft, Sparkles, LogOut, Award, Users } from "lucide-react";
+import { LogOut, Award, ShieldCheck } from "lucide-react";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 import { db, auth, googleProvider } from "./firebase";
-import { C, useFonts } from "./theme";
-import { Avatar, XMark, PrimaryBtn, Badge, Card } from "./components/Primitives";
+import { C, FONT, useFonts } from "./theme";
+import { Avatar, LogoMark, PrimaryBtn, Badge, Card, SprayStreak } from "./components/Primitives";
 import { NAV } from "./data";
 
 import { Dashboard } from "./components/views/Dashboard";
@@ -43,7 +43,7 @@ export default function SpinXWorkspace() {
         setUser(currentUser);
         const uDocRef = doc(db, "users", currentUser.uid);
         const uSnap = await getDoc(uDocRef);
-        
+
         if (uSnap.exists()) {
           setProfile(uSnap.data());
         } else {
@@ -51,7 +51,7 @@ export default function SpinXWorkspace() {
             uid: currentUser.uid,
             name: currentUser.displayName || "Anonymous",
             email: currentUser.email,
-            role: "Presenter", 
+            role: "Presenter",
             points: 0,
             createdAt: new Date()
           };
@@ -92,7 +92,7 @@ export default function SpinXWorkspace() {
     const unsubProcure = onSnapshot(query(collection(db, "procurement"), orderBy("createdAt", "desc")), (s) => setProcurement(s.docs.map(d => ({ id: d.id, ...d.data() }))));
 
     return () => {
-      unsubUsers(); unsubMeetings(); unsubNotices(); unsubExpenses(); 
+      unsubUsers(); unsubMeetings(); unsubNotices(); unsubExpenses();
       unsubInventory(); unsubTasks(); unsubTeam(); unsubDocs(); unsubProcure();
     };
   }, [user]);
@@ -138,43 +138,77 @@ export default function SpinXWorkspace() {
     }
   };
 
-  if (loading) return <div className="flex items-center justify-center w-screen h-screen text-white bg-black font-mono">LOADING SYSTEM...</div>;
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center w-screen h-screen gap-3" style={{ background: C.bg }}>
+        <LogoMark size={44} />
+        <div className="text-xs tracking-[0.3em]" style={{ color: C.textFaint, fontFamily: FONT.head, animation: "spinxPulse 1.4s ease-in-out infinite" }}>
+          LOADING SYSTEM
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
-      <div className="flex flex-col items-center justify-center w-screen h-screen bg-black">
-        <div className="max-w-md w-full border border-neutral-800 p-8 text-center bg-neutral-900">
-          <div className="text-xl font-bold tracking-widest text-white mb-6 font-mono">SPINX WORKSPACE</div>
-          <PrimaryBtn onClick={handleLogin}>AUTHENTICATE VIA GOOGLE</PrimaryBtn>
+      <div className="relative flex flex-col items-center justify-center w-screen h-screen overflow-hidden" style={{ background: C.bg }}>
+        <SprayStreak size={420} opacity={0.05} style={{ top: -80, right: -100 }} />
+        <SprayStreak size={340} opacity={0.04} style={{ bottom: -100, left: -100, transform: "rotate(180deg)" }} />
+        <div className="relative max-w-sm w-full p-8 text-center" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
+          <div className="flex justify-center mb-5">
+            {/* Replace LogoMark with the actual SpinX logo image once available in /src/assets */}
+            <LogoMark size={56} />
+          </div>
+          <div className="text-2xl tracking-[0.25em] mb-1" style={{ fontFamily: FONT.display, color: C.text, fontWeight: 800 }}>
+            SPIN<span style={{ color: C.gold }}>X</span>
+          </div>
+          <div className="text-[11px] uppercase tracking-[0.2em] mb-7" style={{ color: C.textFaint, fontFamily: FONT.head }}>
+            Workspace Access
+          </div>
+          <PrimaryBtn onClick={handleLogin}>Authenticate via Google</PrimaryBtn>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex w-full" style={{ height: "100vh", background: C.bg, fontFamily: "Inter" }}>
+    <div className="flex w-full" style={{ height: "100vh", background: C.bg, fontFamily: FONT.body }}>
       {/* SIDEBAR */}
-      <div className="flex flex-col shrink-0" style={{ width: collapsed ? 68 : 232, background: C.surface, borderRight: `1px solid ${C.border}` }}>
+      <div className="flex flex-col shrink-0 transition-all" style={{ width: collapsed ? 68 : 232, background: C.bgRaised, borderRight: `1px solid ${C.border}` }}>
         <div className="flex items-center gap-2.5 px-4 h-16 shrink-0 border-b" style={{ borderColor: C.border }}>
-          <XMark size={20} strokeWidth={4} />
-          {!collapsed && <span className="text-white font-bold text-sm tracking-wider font-mono">SPINX ENGINE</span>}
+          <LogoMark size={30} />
+          {!collapsed && (
+            <span className="text-sm tracking-[0.15em]" style={{ fontFamily: FONT.display, color: C.text, fontWeight: 700 }}>
+              SPIN<span style={{ color: C.gold }}>X</span>
+            </span>
+          )}
         </div>
 
         <div className="flex-1 py-3 px-2.5 space-y-0.5 overflow-y-auto">
           {allowedNav.map(n => {
             const isActive = active === n.id;
             return (
-              <button key={n.id} onClick={() => setActive(n.id)} className="w-full flex items-center gap-3 px-2.5 py-2.5 relative text-neutral-400 hover:text-white"
-                style={{ background: isActive ? C.goldSoft : "transparent", color: isActive ? C.gold : "" }}>
+              <button
+                key={n.id}
+                onClick={() => setActive(n.id)}
+                className="w-full flex items-center gap-3 px-2.5 py-2.5 relative transition-colors"
+                style={{
+                  background: isActive ? C.goldSoft : "transparent",
+                  color: isActive ? C.gold : C.textDim,
+                  borderLeft: isActive ? `2px solid ${C.gold}` : "2px solid transparent",
+                }}
+                onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.color = C.text; }}
+                onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.color = C.textDim; }}
+              >
                 <n.icon size={16} />
-                {!collapsed && <span className="text-sm font-semibold">{n.label}</span>}
+                {!collapsed && <span className="text-sm font-medium" style={{ fontFamily: FONT.head }}>{n.label}</span>}
               </button>
             );
           })}
         </div>
 
         <div className="p-2.5 shrink-0 border-t" style={{ borderColor: C.border }}>
-          <button onClick={() => setCollapsed(!collapsed)} className="w-full text-center text-xs text-neutral-500">
+          <button onClick={() => setCollapsed(!collapsed)} className="w-full text-center text-[11px] py-1.5" style={{ color: C.textFaint, fontFamily: FONT.head }}>
             {collapsed ? "Expand" : "Collapse menu"}
           </button>
         </div>
@@ -183,67 +217,74 @@ export default function SpinXWorkspace() {
       {/* MAIN CONTAINER */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex items-center gap-4 px-6 h-16 shrink-0 border-b" style={{ borderColor: C.border, background: C.bg }}>
-          
+
           {profile.role !== "Owner" && (
-            <div className="flex items-center gap-3 bg-neutral-900 px-3 py-1.5 border border-neutral-800 rounded">
-              <Award size={14} className="text-amber-400" />
-              <div className="text-xs font-semibold text-neutral-300">
-                Score: <span className="text-white font-mono">{profile.points || 0}</span> / 5000 PTS
+            <div className="flex items-center gap-3 px-3 py-1.5" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
+              <Award size={14} style={{ color: C.gold }} />
+              <div className="text-xs font-medium" style={{ color: C.textDim, fontFamily: FONT.body }}>
+                Score: <span style={{ color: C.text, fontFamily: FONT.mono }}>{profile.points || 0}</span> / 5000 pts
               </div>
               {profile.points >= 5000 && (
-                <button onClick={handleRedeemPoints} className="text-[10px] uppercase font-bold px-2 py-0.5 bg-amber-500 text-black rounded ml-1">
+                <button onClick={handleRedeemPoints} className="text-[10px] uppercase font-bold px-2 py-0.5" style={{ background: C.gold, color: "#15110A", fontFamily: FONT.head }}>
                   Redeem ₹5k
                 </button>
               )}
             </div>
           )}
 
-          <div className="ml-auto flex items-center gap-4 text-white">
+          <div className="ml-auto flex items-center gap-4">
             <Badge tone="gold">{profile.role}</Badge>
-            <button onClick={handleLogout} className="text-neutral-400 hover:text-white"><LogOut size={16} /></button>
+            <button onClick={handleLogout} style={{ color: C.textFaint }} onMouseEnter={e => e.currentTarget.style.color = C.text} onMouseLeave={e => e.currentTarget.style.color = C.textFaint}>
+              <LogOut size={16} />
+            </button>
             <div className="flex items-center gap-2">
               {user?.photoURL ? (
-                <img src={user.photoURL} className="w-8 h-8 rounded-full border border-neutral-800" alt="avatar" />
+                <img src={user.photoURL} className="w-8 h-8 border" style={{ borderColor: C.border, borderRadius: "50%" }} alt="avatar" />
               ) : (
                 <Avatar name={user?.displayName || "User"} size={32} />
               )}
               <div className="text-left">
-                <div className="text-xs font-bold leading-none">{user?.displayName}</div>
-                <div className="text-[10px] text-neutral-500 font-mono">{user?.email}</div>
+                <div className="text-xs font-semibold leading-none" style={{ color: C.text, fontFamily: FONT.head }}>{user?.displayName}</div>
+                <div className="text-[10px] mt-0.5" style={{ color: C.textFaint, fontFamily: FONT.mono }}>{user?.email}</div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 bg-black">
+        <div className="flex-1 overflow-y-auto p-6" style={{ background: C.bg }}>
           {active === "team" ? (
             <div>
               <Team liveTeam={team} />
-              
+
               {["Owner", "Head Developer"].includes(profile.role) && (
                 <div className="mt-8">
-                  <div className="text-white font-bold text-sm uppercase tracking-wider mb-3 font-mono">System Core Access Controls</div>
-                  <Card className="p-0 overflow-hidden border border-neutral-800">
+                  <div className="flex items-center gap-2 mb-3">
+                    <ShieldCheck size={14} style={{ color: C.gold }} />
+                    <div className="text-sm font-semibold uppercase tracking-wider" style={{ color: C.text, fontFamily: FONT.head }}>
+                      System Core Access Controls
+                    </div>
+                  </div>
+                  <Card pad="p-0">
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
-                        <tr className="bg-neutral-900 text-neutral-400 border-b border-neutral-800 font-mono">
-                          <th className="p-3">Member Name</th>
-                          <th className="p-3">Email Handle</th>
-                          <th className="p-3">Score Ledger</th>
-                          <th className="p-3">System Access Privilege</th>
+                        <tr style={{ background: C.surface3, borderBottom: `1px solid ${C.border}` }}>
+                          {["Member Name", "Email Handle", "Score Ledger", "System Access Privilege"].map(h => (
+                            <th key={h} className="p-3 text-[11px] uppercase tracking-wider font-medium" style={{ color: C.textFaint, fontFamily: FONT.head }}>{h}</th>
+                          ))}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-neutral-800 text-neutral-300">
+                      <tbody>
                         {allUsers.map((u) => (
-                          <tr key={u.id} className="hover:bg-neutral-900/50">
-                            <td className="p-3 font-semibold text-white">{u.name}</td>
-                            <td className="p-3 font-mono text-neutral-500">{u.email}</td>
-                            <td className="p-3 font-mono text-amber-400 font-semibold">{u.role === "Owner" ? "—" : `${u.points || 0} PTS`}</td>
+                          <tr key={u.id} style={{ borderBottom: `1px solid ${C.border}` }}>
+                            <td className="p-3 font-semibold" style={{ color: C.text, fontFamily: FONT.body }}>{u.name}</td>
+                            <td className="p-3" style={{ color: C.textFaint, fontFamily: FONT.mono }}>{u.email}</td>
+                            <td className="p-3 font-semibold" style={{ color: C.gold, fontFamily: FONT.mono }}>{u.role === "Owner" ? "—" : `${u.points || 0} pts`}</td>
                             <td className="p-3">
-                              <select 
+                              <select
                                 value={u.role || "Presenter"}
                                 onChange={(e) => handleUpdateRole(u.id, e.target.value)}
-                                className="bg-neutral-950 border border-neutral-800 px-2 py-1 text-white text-xs outline-none"
+                                className="border px-2 py-1 text-xs outline-none"
+                                style={{ background: C.bg, borderColor: C.border, color: C.text, fontFamily: FONT.body }}
                               >
                                 <option value="Owner">Owner</option>
                                 <option value="Head Developer">Head Developer</option>

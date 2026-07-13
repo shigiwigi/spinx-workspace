@@ -1,9 +1,11 @@
 import React, { useState } from "react";
-import { Plus, Check, Clock, ChevronDown, CircleDot } from "lucide-react";
+import { Plus, Check, Clock, ChevronDown, CircleDot, CalendarClock } from "lucide-react";
 import { collection, addDoc, doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
-import { C } from "../../theme";
+import { C, FONT } from "../../theme";
 import { Card, Eyebrow, SectionHeader, Badge, PrimaryBtn, GhostBtn, Avatar } from "../Primitives";
+
+const inputStyle = { borderColor: C.border, background: "transparent", color: C.text, fontFamily: FONT.body };
 
 export function Meetings({ liveMeetings = [] }) {
   const [expanded, setExpanded] = useState(null);
@@ -45,39 +47,41 @@ export function Meetings({ liveMeetings = [] }) {
         action={<PrimaryBtn icon={Plus} onClick={() => setShowForm(!showForm)}>Schedule meeting</PrimaryBtn>} />
 
       {showForm && (
-        <Card className="mb-4">
+        <Card className="mb-4" tag>
           <div className="grid grid-cols-4 gap-3">
             <input placeholder="Meeting title" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}
-              className="col-span-2 bg-transparent border px-3 py-2 text-sm outline-none" style={{ borderColor: C.border, color: C.text, fontFamily: "Inter" }} />
+              className="col-span-2 border px-3 py-2 text-sm outline-none" style={inputStyle} />
             <input placeholder="Jul 20" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })}
-              className="bg-transparent border px-3 py-2 text-sm outline-none" style={{ borderColor: C.border, color: C.text, fontFamily: "JetBrains Mono" }} />
+              className="border px-3 py-2 text-sm outline-none" style={{ ...inputStyle, fontFamily: FONT.mono }} />
             <input placeholder="2:00 PM" value={form.time} onChange={e => setForm({ ...form, time: e.target.value })}
-              className="bg-transparent border px-3 py-2 text-sm outline-none" style={{ borderColor: C.border, color: C.text, fontFamily: "JetBrains Mono" }} />
+              className="border px-3 py-2 text-sm outline-none" style={{ ...inputStyle, fontFamily: FONT.mono }} />
             <input placeholder="Attendees (comma separated)" value={form.attendees} onChange={e => setForm({ ...form, attendees: e.target.value })}
-              className="col-span-3 bg-transparent border px-3 py-2 text-sm outline-none" style={{ borderColor: C.border, color: C.text, fontFamily: "Inter" }} />
+              className="col-span-3 border px-3 py-2 text-sm outline-none" style={inputStyle} />
             <PrimaryBtn onClick={addMeeting} icon={Check}>Save</PrimaryBtn>
           </div>
         </Card>
       )}
 
       {liveMeetings.length === 0 ? (
-        <Card className="text-center py-12 text-sm" style={{ color: C.textDim, fontFamily: "Inter" }}>
-          No records found. Click "Schedule meeting" to add data.
+        <Card className="text-center py-16 text-sm">
+          <CalendarClock size={30} className="mx-auto mb-2 opacity-40" style={{ color: C.gold }} />
+          <div style={{ color: C.textDim, fontFamily: FONT.body }}>No meetings scheduled yet.</div>
+          <div className="text-xs mt-1" style={{ color: C.textFaint, fontFamily: FONT.body }}>Click "Schedule meeting" to add one.</div>
         </Card>
       ) : (
         <div className="space-y-3">
           {liveMeetings.map(m => (
             <Card key={m.id} pad="p-0">
               <div className="p-4 flex items-center gap-4 cursor-pointer" onClick={() => setExpanded(expanded === m.id ? null : m.id)}>
-                <div className="text-center shrink-0 w-14 px-2 py-1.5" style={{ background: C.surface3, fontFamily: "JetBrains Mono" }}>
+                <div className="text-center shrink-0 w-14 px-2 py-1.5" style={{ background: C.surface3, border: `1px solid ${C.border}`, fontFamily: FONT.mono }}>
                   <div className="text-[10px]" style={{ color: C.textFaint }}>{m.date?.split(" ")[0]}</div>
                   <div className="text-sm font-medium" style={{ color: C.gold }}>{m.date?.split(" ")[1] || ""}</div>
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm font-medium" style={{ color: C.text, fontFamily: "Rajdhani", fontSize: 15 }}>{m.title}</div>
+                  <div className="text-sm font-medium" style={{ color: C.text, fontFamily: FONT.head, fontSize: 15 }}>{m.title}</div>
                   <div className="flex items-center gap-2 mt-1">
                     <Clock size={11} style={{ color: C.textFaint }} />
-                    <span className="text-[11px]" style={{ color: C.textFaint, fontFamily: "JetBrains Mono" }}>{m.time}</span>
+                    <span className="text-[11px]" style={{ color: C.textFaint, fontFamily: FONT.mono }}>{m.time}</span>
                     <div className="flex -space-x-1.5 ml-2">
                       {m.attendees?.map((a, i) => <Avatar key={i} name={a} size={20} />)}
                     </div>
@@ -88,25 +92,25 @@ export function Meetings({ liveMeetings = [] }) {
               </div>
 
               {expanded === m.id && (
-                <div className="px-4 pb-4 pt-2 grid grid-cols-2 gap-4" style={{ borderTop: `1px solid ${C.border}` }}>
+                <div className="px-4 pb-4 pt-3 grid grid-cols-2 gap-4" style={{ borderTop: `1px solid ${C.border}` }}>
                   <div>
                     <Eyebrow>Live notes</Eyebrow>
                     <textarea value={m.notes} onChange={e => updateNotes(m.id, e.target.value)} placeholder="Type notes during the call..."
-                      className="w-full mt-1 bg-transparent border px-3 py-2 text-sm outline-none resize-none" rows={4}
-                      style={{ borderColor: C.border, color: C.text, fontFamily: "Inter" }} />
+                      className="w-full mt-1.5 border px-3 py-2 text-sm outline-none resize-none" rows={4}
+                      style={inputStyle} />
                   </div>
                   <div>
                     <Eyebrow>Action items</Eyebrow>
-                    <div className="space-y-1.5 mt-1">
+                    <div className="space-y-1.5 mt-1.5">
                       {m.actions?.map((a, i) => (
-                        <div key={i} className="flex items-center gap-2 text-sm" style={{ color: C.textDim, fontFamily: "Inter" }}>
+                        <div key={i} className="flex items-center gap-2 text-sm" style={{ color: C.textDim, fontFamily: FONT.body }}>
                           <CircleDot size={12} style={{ color: C.gold }} /> {a}
                         </div>
                       ))}
                       <div className="flex gap-2 mt-2">
                         <input value={actionDraft} onChange={e => setActionDraft(e.target.value)} placeholder="Add action item"
                           onKeyDown={e => e.key === "Enter" && addAction(m.id, m.actions || [])}
-                          className="flex-1 bg-transparent border px-2.5 py-1.5 text-xs outline-none" style={{ borderColor: C.border, color: C.text, fontFamily: "Inter" }} />
+                          className="flex-1 border px-2.5 py-1.5 text-xs outline-none" style={inputStyle} />
                         <GhostBtn icon={Plus} onClick={() => addAction(m.id, m.actions || [])}>Add</GhostBtn>
                       </div>
                     </div>

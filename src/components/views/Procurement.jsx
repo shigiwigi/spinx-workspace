@@ -2,7 +2,7 @@ import React from "react";
 import { ShoppingCart, Check, X } from "lucide-react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
-import { C } from "../../theme";
+import { C, FONT } from "../../theme";
 import { Card, SectionHeader, Badge } from "../Primitives";
 
 export function Procurement({ liveProcurement = [] }) {
@@ -12,11 +12,11 @@ export function Procurement({ liveProcurement = [] }) {
 
   return (
     <div>
-      <SectionHeader title="Procurement" subtitle="Purchase items ledger trackers." />
+      <SectionHeader title="Procurement" subtitle="Purchase quotation ledger." />
       {liveProcurement.length === 0 ? (
-        <Card className="text-center py-16 text-sm" style={{ color: C.textDim, fontFamily: "Inter" }}>
+        <Card className="text-center py-16 text-sm">
           <ShoppingCart size={32} className="mx-auto mb-2 opacity-40" style={{ color: C.gold }} />
-          No procurement track requests listed.
+          <div style={{ color: C.textDim, fontFamily: FONT.body }}>No procurement requests listed.</div>
         </Card>
       ) : (
         <Card pad="p-0">
@@ -24,16 +24,16 @@ export function Procurement({ liveProcurement = [] }) {
             <thead>
               <tr style={{ borderBottom: `1px solid ${C.border}` }}>
                 {["Item", "Vendor", "Quotation", "Status", ""].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-[11px] uppercase tracking-wider font-medium" style={{ color: C.textFaint, fontFamily: "Rajdhani" }}>{h}</th>
+                  <th key={h} className="text-left px-4 py-3 text-[11px] uppercase tracking-wider font-medium" style={{ color: C.textFaint, fontFamily: FONT.head }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {liveProcurement.map(r => (
                 <tr key={r.id} style={{ borderBottom: `1px solid ${C.border}` }}>
-                  <td className="px-4 py-3" style={{ color: C.text, fontFamily: "Inter" }}>{r.item}</td>
-                  <td className="px-4 py-3" style={{ color: C.textDim, fontFamily: "Inter", fontSize: 13 }}>{r.vendor}</td>
-                  <td className="px-4 py-3" style={{ color: C.text, fontFamily: "JetBrains Mono" }}>₹{r.quote?.toLocaleString()}</td>
+                  <td className="px-4 py-3" style={{ color: C.text, fontFamily: FONT.body }}>{r.item}</td>
+                  <td className="px-4 py-3" style={{ color: C.textDim, fontFamily: FONT.body, fontSize: 13 }}>{r.vendor}</td>
+                  <td className="px-4 py-3" style={{ color: C.text, fontFamily: FONT.mono }}>₹{r.quote?.toLocaleString()}</td>
                   <td className="px-4 py-3">
                     <Badge tone={r.status === "Approved" ? "success" : r.status === "Rejected" ? "danger" : "gold"}>{r.status}</Badge>
                   </td>

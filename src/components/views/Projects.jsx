@@ -1,13 +1,14 @@
 import React, { useState } from "react";
-import { CheckCircle2, ThumbsUp, AlertCircle, FileText } from "lucide-react";
+import { AlertCircle, Rocket } from "lucide-react";
 import { doc, updateDoc, collection, addDoc, increment } from "firebase/firestore";
 import { db } from "../../firebase";
-import { C, clipCorner } from "../../theme";
-import { SectionHeader, Badge, Card } from "../Primitives";
+import { C, FONT, clipCorner } from "../../theme";
+import { SectionHeader, Badge, Card, Avatar, PrimaryBtn } from "../Primitives";
 
 export function Projects({ liveTasks = { todo: [], progress: [], done: [], completed: [] }, userRole, userId, allMembers = [] }) {
   const [dragId, setDragId] = useState(null);
   const [dragFrom, setDragFrom] = useState(null);
+  const [dragOverCol, setDragOverCol] = useState(null);
   const [draft, setDraft] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("GENERAL TASKS");
   const [selectedAssignee, setSelectedAssignee] = useState(userId);
@@ -15,34 +16,39 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
   const [reviewFeedback, setReviewFeedback] = useState({});
 
   const categories = ["REVIEW", "GENERAL TASKS", "Bonus Structure"];
+  const categoryTone = { REVIEW: "info", "GENERAL TASKS": "default", "Bonus Structure": "gold" };
   const cols = [
-    { key: "todo", label: "To Do" }, 
-    { key: "progress", label: "In Progress" }, 
+    { key: "todo", label: "To Do" },
+    { key: "progress", label: "In Progress" },
     { key: "done", label: "Done (Reviewing)" },
-    { key: "completed", label: "Completed" }
+    { key: "completed", label: "Completed" },
   ];
+  const canManageBoard = ["Head Developer", "Developer", "Owner"].includes(userRole);
+  const canDrag = !["Presenter", "Media", "Operations"].includes(userRole);
 
   const onDrop = async (colKey) => {
+    setDragOverCol(null);
     if (dragId == null || dragFrom == null || dragFrom === colKey) return;
-    if (colKey === "completed") return; 
-    if (["Presenter", "Media", "Operations"].includes(userRole)) return;
+    if (colKey === "completed") return; // completion only happens via owner sign-off
+    if (!canDrag) return;
 
     await updateDoc(doc(db, "tasks", dragId), { status: colKey });
-    setDragId(null); setDragFrom(null);
+    setDragId(null);
+    setDragFrom(null);
   };
 
   const createTask = async () => {
-    if (!draft.trim()) return;
-    
+    if (!draft.trim() || !selectedAssignee) return;
+
     const targetAssignee = allMembers.find(m => m.id === selectedAssignee) || { name: "Unassigned" };
 
     await addDoc(collection(db, "tasks"), {
-      title: draft,
+      title: draft.trim(),
       category: selectedCategory,
       assignedToId: selectedAssignee,
       assignedToName: targetAssignee.name,
       status: "todo",
-      pointsValue: 0, 
+      pointsValue: 0,
       feedback: "",
       createdAt: new Date()
     });
@@ -51,129 +57,187 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
 
   const finalizeTaskByOwner = async (taskId, workerId) => {
     if (userRole !== "Owner") return;
-    
-    const allocatedPoints = Number(reviewPoints[taskId]) || 0;
-    const feedbackText = reviewFeedback[taskId] || "Task accepted successfully.";
 
-    // 1. Mark task complete with dynamic points and justification text
-    await updateDoc(doc(db, "tasks", taskId), { 
+    const allocatedPoints = Number(reviewPoints[taskId]) || 0;
+    const feedbackText = reviewFeedback[taskId]?.trim() || "Task accepted successfully.";
+
+    await updateDoc(doc(db, "tasks", taskId), {
       status: "completed",
       pointsValue: allocatedPoints,
       feedback: feedbackText
     });
 
-    // 2. Increment score index only if target worker profile is not the Owner
     const workerDoc = allMembers.find(m => m.id === workerId);
     if (workerDoc && workerDoc.role !== "Owner") {
       await updateDoc(doc(db, "users", workerId), {
         points: increment(allocatedPoints)
       });
     }
+
+    setReviewPoints(prev => { const n = { ...prev }; delete n[taskId]; return n; });
+    setReviewFeedback(prev => { const n = { ...prev }; delete n[taskId]; return n; });
   };
+
+  const inputStyle = { borderColor: C.border, background: C.bg, color: C.text, fontFamily: FONT.body };
 
   return (
     <div>
       <SectionHeader title="Projects & Operations" subtitle="Track tasks, assign categories, and manage owner payouts." />
-      
-      {/* Universal Assignment Engine (Restricted to Builders) */}
-      {["Head Developer", "Developer", "Owner"].includes(userRole) && (
-        <Card className="mb-6 p-4 border border-neutral-800 bg-neutral-900">
-          <div className="text-white font-mono text-xs uppercase tracking-wider mb-3">Initialize Operation Task</div>
+
+      {/* TASK CREATION — restricted to builders */}
+      {canManageBoard && (
+        <Card className="mb-6" tag>
+          <div className="flex items-center gap-2 mb-3">
+            <Rocket size={13} style={{ color: C.gold }} />
+            <span className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: C.textFaint, fontFamily: FONT.head }}>
+              Initialize operation task
+            </span>
+          </div>
           <div className="grid grid-cols-4 gap-3">
-            <input 
-              value={draft} 
-              onChange={e => setDraft(e.target.value)} 
+            <input
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && createTask()}
               placeholder="Task name or description..."
-              className="col-span-2 bg-neutral-950 border border-neutral-800 px-3 py-2 text-xs outline-none text-white font-sans"
+              className="col-span-2 border px-3 py-2 text-xs outline-none"
+              style={inputStyle}
             />
-            <select 
-              value={selectedCategory} 
+            <select
+              value={selectedCategory}
               onChange={e => setSelectedCategory(e.target.value)}
-              className="bg-neutral-950 border border-neutral-800 px-2 py-2 text-white text-xs outline-none font-mono"
+              className="border px-2 py-2 text-xs outline-none"
+              style={{ ...inputStyle, fontFamily: FONT.head }}
             >
-              {categories.map((c, i) => <option key={i} value={c}>{c}</option>)}
+              {categories.map((c, i) => <option key={i} value={c} style={{ background: C.surface }}>{c}</option>)}
             </select>
-            <select 
-              value={selectedAssignee} 
+            <select
+              value={selectedAssignee}
               onChange={e => setSelectedAssignee(e.target.value)}
-              className="bg-neutral-950 border border-neutral-800 px-2 py-2 text-white text-xs outline-none"
+              className="border px-2 py-2 text-xs outline-none"
+              style={inputStyle}
             >
-              {allMembers.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.role})</option>)}
+              {allMembers.length === 0 && <option value="">No members loaded</option>}
+              {allMembers.map((m) => <option key={m.id} value={m.id} style={{ background: C.surface }}>{m.name} ({m.role})</option>)}
             </select>
           </div>
-          <button onClick={createTask} className="mt-3 px-4 py-2 bg-amber-500 text-black font-bold uppercase tracking-wider text-[10px] rounded hover:bg-amber-600 transition-colors">
-            Deploy Task Board
-          </button>
+          <div className="mt-3">
+            <PrimaryBtn onClick={createTask} small disabled={!draft.trim() || !selectedAssignee}>Deploy task to board</PrimaryBtn>
+          </div>
         </Card>
       )}
 
-      {/* KANBAN BOARD MATRIX LAYOUT */}
+      {/* KANBAN BOARD */}
       <div className="grid grid-cols-4 gap-4">
-        {cols.map(col => (
-          <div key={col.key} onDragOver={e => e.preventDefault()} onDrop={() => onDrop(col.key)}>
-            <div className="flex items-center justify-between mb-3 border-b border-neutral-800 pb-2 font-mono">
-              <span className="text-xs uppercase font-medium tracking-widest text-neutral-400">{col.label}</span>
-              <span className="text-xs px-2 py-0.5 bg-neutral-900 text-neutral-500 rounded font-mono">{liveTasks[col.key]?.length || 0}</span>
-            </div>
+        {cols.map(col => {
+          const items = liveTasks[col.key] || [];
+          const isDropTarget = dragOverCol === col.key && dragFrom !== col.key && col.key !== "completed";
+          return (
+            <div
+              key={col.key}
+              onDragOver={e => { e.preventDefault(); if (col.key !== "completed") setDragOverCol(col.key); }}
+              onDragLeave={() => setDragOverCol(prev => (prev === col.key ? null : prev))}
+              onDrop={() => onDrop(col.key)}
+            >
+              <div className="flex items-center justify-between mb-3 pb-2 border-b" style={{ borderColor: C.border }}>
+                <span className="text-xs uppercase font-semibold tracking-widest" style={{ color: C.textDim, fontFamily: FONT.head }}>{col.label}</span>
+                <span
+                  className="text-[11px] px-2 py-0.5"
+                  style={{ background: C.surface3, color: items.length ? C.gold : C.textFaint, fontFamily: FONT.mono, border: `1px solid ${C.border}` }}
+                >
+                  {items.length}
+                </span>
+              </div>
 
-            <div className="space-y-3 min-h-[200px] bg-neutral-950/40 p-2 border border-dashed border-neutral-900">
-              {liveTasks[col.key]?.map(t => (
-                <div key={t.id} draggable={!["completed", "done"].includes(col.key) && !["Presenter", "Media", "Operations"].includes(userRole)} 
-                  onDragStart={() => { setDragId(t.id); setDragFrom(col.key); }}
-                  className="p-3 border border-neutral-800 bg-neutral-900 relative"
-                  style={{ ...clipCorner(8) }}>
-                  
-                  <div className="flex items-center justify-between mb-2">
-                    <Badge>{t.category || "GENERAL"}</Badge>
-                    <div className="text-[10px] text-neutral-400 font-sans">Assignee: <span className="text-white font-medium">{t.assignedToName}</span></div>
+              <div
+                className="space-y-3 min-h-[220px] p-2 border border-dashed transition-colors"
+                style={{
+                  background: isDropTarget ? C.goldSoft : "rgba(255,255,255,0.01)",
+                  borderColor: isDropTarget ? C.goldLine : C.border,
+                }}
+              >
+                {items.length === 0 && (
+                  <div className="text-[11px] text-center py-8" style={{ color: C.textFaint, fontFamily: FONT.body }}>
+                    No tasks here yet.
                   </div>
+                )}
 
-                  <div className="text-xs text-neutral-200 my-2 leading-relaxed" style={{ fontFamily: "Inter" }}>{t.title}</div>
-                  
-                  {/* COMPLETED CARD STATE (DISPLAY JUSTIFICATION & SCORE OUTCOME) */}
-                  {col.key === "completed" && (
-                    <div className="mt-2 pt-2 border-t border-neutral-800 text-[11px] space-y-1 font-mono">
-                      <div className="text-amber-400 font-semibold">+ {t.pointsValue || 0} SCORE POINTS</div>
-                      <div className="text-neutral-500 leading-tight font-sans italic">“ {t.feedback} ”</div>
+                {items.map(t => (
+                  <div
+                    key={t.id}
+                    draggable={!["completed", "done"].includes(col.key) && canDrag}
+                    onDragStart={() => { setDragId(t.id); setDragFrom(col.key); }}
+                    onDragEnd={() => setDragOverCol(null)}
+                    className="relative p-3"
+                    style={{
+                      background: C.surface,
+                      border: `1px solid ${C.border}`,
+                      cursor: !["completed", "done"].includes(col.key) && canDrag ? "grab" : "default",
+                      ...clipCorner(8, ["tr"]),
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-2 gap-2">
+                      <Badge tone={categoryTone[t.category] || "default"}>{t.category || "GENERAL"}</Badge>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Avatar name={t.assignedToName || "?"} size={18} />
+                        <span className="text-[10px] truncate max-w-[70px]" style={{ color: C.textFaint, fontFamily: FONT.body }}>{t.assignedToName}</span>
+                      </div>
                     </div>
-                  )}
 
-                  {/* OWNER REVIEW DASHBOARD MATRIX */}
-                  {col.key === "done" && userRole === "Owner" && (
-                    <div className="mt-3 pt-3 border-t border-neutral-800 space-y-2">
-                      <input 
-                        type="number" 
-                        placeholder="Points (e.g., 750, 1500)" 
-                        value={reviewPoints[t.id] || ""} 
-                        onChange={e => setReviewPoints({ ...reviewPoints, [t.id]: e.target.value })}
-                        className="w-full bg-neutral-950 border border-neutral-800 px-2 py-1.5 text-xs text-white font-mono outline-none"
-                      />
-                      <textarea 
-                        placeholder="Owner evaluation justification statement..." 
-                        rows={2}
-                        value={reviewFeedback[t.id] || ""} 
-                        onChange={e => setReviewFeedback({ ...reviewFeedback, [t.id]: e.target.value })}
-                        className="w-full bg-neutral-950 border border-neutral-800 px-2 py-1.5 text-xs text-white outline-none resize-none"
-                      />
-                      <button 
-                        onClick={() => finalizeTaskByOwner(t.id, t.assignedToId)}
-                        className="w-full flex items-center justify-center gap-2 text-[10px] uppercase tracking-wider font-bold py-1.5 border border-emerald-500 text-emerald-400 bg-emerald-950/20 hover:bg-emerald-500 hover:text-black transition-all"
-                      >
-                        Sign-off Completion
-                      </button>
-                    </div>
-                  )}
+                    <div className="text-xs leading-relaxed" style={{ color: C.text, fontFamily: FONT.body }}>{t.title}</div>
 
-                  {col.key === "done" && userRole !== "Owner" && (
-                    <div className="flex items-center gap-1.5 text-[10px] font-mono text-amber-400 bg-amber-500/5 px-2 py-1 border border-amber-500/10 mt-2">
-                      <AlertCircle size={10} /> Pending Owner Evaluation
-                    </div>
-                  )}
-                </div>
-              ))}
+                    {col.key === "completed" && (
+                      <div className="mt-2 pt-2 border-t space-y-1" style={{ borderColor: C.border }}>
+                        <div className="text-[11px] font-semibold" style={{ color: C.gold, fontFamily: FONT.mono }}>+{t.pointsValue || 0} score points</div>
+                        <div className="text-[11px] italic leading-tight" style={{ color: C.textFaint, fontFamily: FONT.body }}>"{t.feedback}"</div>
+                      </div>
+                    )}
+
+                    {col.key === "done" && userRole === "Owner" && (
+                      <div className="mt-3 pt-3 border-t space-y-2" style={{ borderColor: C.border }}>
+                        <input
+                          type="number"
+                          placeholder="Points (e.g., 750, 1500)"
+                          value={reviewPoints[t.id] || ""}
+                          onChange={e => setReviewPoints({ ...reviewPoints, [t.id]: e.target.value })}
+                          className="w-full border px-2 py-1.5 text-xs outline-none"
+                          style={{ ...inputStyle, fontFamily: FONT.mono }}
+                        />
+                        <textarea
+                          placeholder="Evaluation justification..."
+                          rows={2}
+                          value={reviewFeedback[t.id] || ""}
+                          onChange={e => setReviewFeedback({ ...reviewFeedback, [t.id]: e.target.value })}
+                          className="w-full border px-2 py-1.5 text-xs outline-none resize-none"
+                          style={inputStyle}
+                        />
+                        <button
+                          onClick={() => finalizeTaskByOwner(t.id, t.assignedToId)}
+                          disabled={!reviewPoints[t.id]}
+                          className="w-full flex items-center justify-center gap-2 text-[10px] uppercase tracking-wider font-bold py-1.5 border transition-all"
+                          style={{
+                            borderColor: reviewPoints[t.id] ? C.success : C.border,
+                            color: reviewPoints[t.id] ? C.success : C.textFaint,
+                            background: reviewPoints[t.id] ? C.successSoft : "transparent",
+                            cursor: reviewPoints[t.id] ? "pointer" : "not-allowed",
+                            fontFamily: FONT.head,
+                          }}
+                        >
+                          Sign off completion
+                        </button>
+                      </div>
+                    )}
+
+                    {col.key === "done" && userRole !== "Owner" && (
+                      <div className="flex items-center gap-1.5 text-[10px] mt-2 px-2 py-1" style={{ color: C.gold, background: C.goldSoft, border: `1px solid ${C.goldLine}`, fontFamily: FONT.mono }}>
+                        <AlertCircle size={10} /> Pending owner evaluation
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
