@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { Search, Bell, ChevronRight, ChevronLeft, Sparkles } from "lucide-react";
+import { Search, Bell, ChevronRight, ChevronLeft, Sparkles, LogOut } from "lucide-react";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
-import { db } from "./firebase";
+import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
+import { db, auth, googleProvider } from "./firebase";
 import { C, useFonts } from "./theme";
-import { Avatar, XMark } from "./components/Primitives";
+import { Avatar, XMark, PrimaryBtn } from "./components/Primitives";
 import { NAV } from "./data";
 
-// Clean, modular individual page imports
 import { Dashboard } from "./components/views/Dashboard";
 import { Meetings } from "./components/views/Meetings";
 import { Notices } from "./components/views/Notices";
@@ -21,6 +21,8 @@ import { AIFeatures } from "./components/views/AIFeatures";
 
 export default function SpinXWorkspace() {
   useFonts();
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [active, setActive] = useState("dashboard");
   const [collapsed, setCollapsed] = useState(false);
 
@@ -33,7 +35,19 @@ export default function SpinXWorkspace() {
   const [docs, setDocs] = useState([]);
   const [procurement, setProcurement] = useState([]);
 
+  // Monitor active User login profiles
   useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
+    return () => unsubscribeAuth();
+  }, []);
+
+  // Synchronize listeners if user identity is confirmed
+  useEffect(() => {
+    if (!user) return;
+
     const unsubMeetings = onSnapshot(query(collection(db, "meetings"), orderBy("createdAt", "desc")), (s) => setMeetings(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubNotices = onSnapshot(query(collection(db, "notices"), orderBy("createdAt", "desc")), (s) => setNotices(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubExpenses = onSnapshot(query(collection(db, "expenses"), orderBy("createdAt", "desc")), (s) => setExpenses(s.docs.map(d => ({ id: d.id, ...d.data() }))));
@@ -50,7 +64,24 @@ export default function SpinXWorkspace() {
       unsubMeetings(); unsubNotices(); unsubExpenses(); unsubInventory(); unsubTasks();
       unsubTeam(); unsubDocs(); unsubProcure();
     };
-  }, []);
+  }, [user]);
+
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (err) {
+      console.error("Sign in failed:", err);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setActive("dashboard");
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
+  };
 
   const renderSection = () => {
     switch (active) {
@@ -59,7 +90,7 @@ export default function SpinXWorkspace() {
       case "notices": return <Notices liveNotices={notices} />;
       case "finance": return <Finance liveExpenses={expenses} />;
       case "inventory": return <Inventory liveInventory={inventory} />;
-      case "projects": return <Projects liveTasks={tasks} />;
+      case "projects": return <Projects liveTasks={tasks} user={user} />;
       case "team": return <Team liveTeam={team} />;
       case "docs": return <Documentation liveDocs={docs} />;
       case "procurement": return <Procurement liveProcurement={procurement} />;
@@ -68,6 +99,30 @@ export default function SpinXWorkspace() {
       default: return <Dashboard meetings={meetings} inventory={inventory} notices={notices} tasks={tasks} expenses={expenses} />;
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center w-screen h-screen" style={{ background: C.bg, color: C.gold, fontFamily: "JetBrains Mono" }}>
+        LOADING SPINX SYSTEM...
+      </div>
+    );
+  }
+
+  // Identity Guard Splash Landing Form Layout
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center w-screen h-screen p-4" style={{ background: C.bg }}>
+        <div className="max-w-md w-full border p-8 text-center relative" style={{ background: C.surface, borderColor: C.border, clipPath: "polygon(0 0, calc(100% - 24px) 0, 100% 24px, 100% 100%, 0 100%)" }}>
+          <div style={{ fontFamily: "Orbitron", fontWeight: 800, fontSize: 28, color: C.text, letterSpacing: "0.05em" }}>SPINX</div>
+          <div style={{ fontFamily: "JetBrains Mono", fontSize: 11, color: C.textFaint, letterSpacing: "0.15em", marginTop: 2, marginBottom: 32 }}>WORKSPACE PLATFORM</div>
+          <p className="text-sm mb-6" style={{ color: C.textDim, fontFamily: "Inter" }}>Authorized engineering hub access restricted. Identity sign-in required.</p>
+          <div className="flex justify-center">
+            <PrimaryBtn onClick={handleLogin}>AUTHENTICATE VIA GOOGLE</PrimaryBtn>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex w-full" style={{ height: "100vh", background: C.bg, fontFamily: "Inter" }}>
@@ -81,7 +136,6 @@ export default function SpinXWorkspace() {
         ::-webkit-scrollbar-thumb { background: ${C.surface3}; }
         .spx-fade { animation: spxFade 0.25s ease both; }
         @keyframes spxFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-        @media (prefers-reduced-motion: reduce) { .spx-fade { animation: none; } }
       `}</style>
 
       {/* SIDEBAR */}
@@ -135,16 +189,19 @@ export default function SpinXWorkspace() {
             <input placeholder="Search projects, docs, people..." className="bg-transparent outline-none text-sm flex-1" style={{ color: C.text, fontFamily: "Inter" }} />
           </div>
           <div className="ml-auto flex items-center gap-4">
-            <button className="relative">
-              <Bell size={17} style={{ color: C.textDim }} />
-              <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full" style={{ background: C.gold }} />
+            <button onClick={handleLogout} title="Log Out" className="p-1 hover:text-red-400 transition-colors" style={{ color: C.textDim }}>
+              <LogOut size={16} />
             </button>
             <div className="w-px h-6" style={{ background: C.border }} />
             <div className="flex items-center gap-2.5">
-              <Avatar name="Shihan" size={32} />
+              {user.photoURL ? (
+                <img src={user.photoURL} alt={user.displayName} className="rounded-none object-cover border" style={{ width: 32, height: 32, borderColor: C.border }} />
+              ) : (
+                <Avatar name={user.displayName || "User"} size={32} />
+              )}
               <div>
-                <div className="text-sm font-semibold leading-none" style={{ color: C.text, fontFamily: "Rajdhani" }}>Shihan</div>
-                <div className="text-[11px] mt-0.5" style={{ color: C.textFaint, fontFamily: "Inter" }}>Founder</div>
+                <div className="text-sm font-semibold leading-none" style={{ color: C.text, fontFamily: "Rajdhani" }}>{user.displayName || "Team Member"}</div>
+                <div className="text-[10px] mt-1 shrink-0" style={{ color: C.textFaint, fontFamily: "JetBrains Mono" }}>{user.email}</div>
               </div>
             </div>
           </div>
