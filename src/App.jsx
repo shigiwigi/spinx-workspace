@@ -5,14 +5,25 @@ import { db } from "./firebase";
 import { C, useFonts } from "./theme";
 import { Avatar, XMark } from "./components/Primitives";
 import { NAV } from "./data";
-import { Dashboard, Meetings, Notices, Finance, Inventory, Projects, Team, Documentation, Procurement, Analytics, AIFeatures } from "./components/Views";
+
+// Clean, modular individual page imports
+import { Dashboard } from "./components/views/Dashboard";
+import { Meetings } from "./components/views/Meetings";
+import { Notices } from "./components/views/Notices";
+import { Finance } from "./components/views/Finance";
+import { Inventory } from "./components/views/Inventory";
+import { Projects } from "./components/views/Projects";
+import { Team } from "./components/views/Team";
+import { Documentation } from "./components/views/Documentation";
+import { Procurement } from "./components/views/Procurement";
+import { Analytics } from "./components/views/Analytics";
+import { AIFeatures } from "./components/views/AIFeatures";
 
 export default function SpinXWorkspace() {
   useFonts();
   const [active, setActive] = useState("dashboard");
   const [collapsed, setCollapsed] = useState(false);
 
-  // Live database states
   const [meetings, setMeetings] = useState([]);
   const [notices, setNotices] = useState([]);
   const [expenses, setExpenses] = useState([]);
@@ -23,17 +34,17 @@ export default function SpinXWorkspace() {
   const [procurement, setProcurement] = useState([]);
 
   useEffect(() => {
-    const unsubMeetings = onSnapshot(query(collection(db, "meetings"), orderBy("createdAt", "desc")), (s) => setMeetings(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
-    const unsubNotices = onSnapshot(query(collection(db, "notices"), orderBy("createdAt", "desc")), (s) => setNotices(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
-    const unsubExpenses = onSnapshot(query(collection(db, "expenses"), orderBy("createdAt", "desc")), (s) => setExpenses(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
-    const unsubInventory = onSnapshot(query(collection(db, "inventory"), orderBy("createdAt", "desc")), (s) => setInventory(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+    const unsubMeetings = onSnapshot(query(collection(db, "meetings"), orderBy("createdAt", "desc")), (s) => setMeetings(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubNotices = onSnapshot(query(collection(db, "notices"), orderBy("createdAt", "desc")), (s) => setNotices(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubExpenses = onSnapshot(query(collection(db, "expenses"), orderBy("createdAt", "desc")), (s) => setExpenses(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubInventory = onSnapshot(query(collection(db, "inventory"), orderBy("createdAt", "desc")), (s) => setInventory(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubTasks = onSnapshot(query(collection(db, "tasks"), orderBy("createdAt", "desc")), (s) => {
       const all = s.docs.map(d => ({ id: d.id, ...d.data() }));
       setTasks({ todo: all.filter(t => t.status === "todo"), progress: all.filter(t => t.status === "progress"), done: all.filter(t => t.status === "done") });
-    }, () => {});
-    const unsubTeam = onSnapshot(query(collection(db, "team"), orderBy("createdAt", "asc")), (s) => setTeam(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
-    const unsubDocs = onSnapshot(query(collection(db, "documentation"), orderBy("createdAt", "asc")), (s) => setDocs(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
-    const unsubProcure = onSnapshot(query(collection(db, "procurement"), orderBy("createdAt", "desc")), (s) => setProcurement(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+    });
+    const unsubTeam = onSnapshot(query(collection(db, "team"), orderBy("createdAt", "asc")), (s) => setTeam(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubDocs = onSnapshot(query(collection(db, "documentation"), orderBy("createdAt", "asc")), (s) => setDocs(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubProcure = onSnapshot(query(collection(db, "procurement"), orderBy("createdAt", "desc")), (s) => setProcurement(s.docs.map(d => ({ id: d.id, ...d.data() }))));
 
     return () => {
       unsubMeetings(); unsubNotices(); unsubExpenses(); unsubInventory(); unsubTasks();
