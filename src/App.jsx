@@ -89,7 +89,7 @@ export default function SpinXWorkspace() {
     const unsubInventory = onSnapshot(query(collection(db, "inventory"), orderBy("createdAt", "desc")), (s) => setInventory(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubTeam = onSnapshot(query(collection(db, "team"), orderBy("createdAt", "asc")), (s) => setTeam(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubDocs = onSnapshot(query(collection(db, "documentation"), orderBy("createdAt", "asc")), (s) => setDocs(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubProcure = onSnapshot(query(query(collection(db, "procurement"), orderBy("createdAt", "desc")), (s) => setProcurement(s.docs.map(d => ({ id: d.id, ...d.data() })))));
+    const unsubProcure = onSnapshot(query(collection(db, "procurement"), orderBy("createdAt", "desc")), (s) => setProcurement(s.docs.map(d => ({ id: d.id, ...d.data() }))));
 
     return () => {
       unsubUsers(); unsubMeetings(); unsubNotices(); unsubExpenses(); 
@@ -120,6 +120,23 @@ export default function SpinXWorkspace() {
     if (profile.role === "Presenter") return ["dashboard", "meetings", "notices"].includes(n.id);
     return false;
   });
+
+  const renderSection = () => {
+    switch (active) {
+      case "dashboard": return <Dashboard meetings={meetings} inventory={inventory} notices={notices} tasks={tasks} expenses={expenses} />;
+      case "meetings": return <Meetings liveMeetings={meetings} />;
+      case "notices": return <Notices liveNotices={notices} />;
+      case "finance": return <Finance liveExpenses={expenses} />;
+      case "inventory": return <Inventory liveInventory={inventory} />;
+      case "projects": return <Projects liveTasks={tasks} userRole={profile.role} userId={user.uid} allMembers={allUsers} />;
+      case "team": return <Team liveTeam={team} />;
+      case "docs": return <Documentation liveDocs={docs} />;
+      case "procurement": return <Procurement liveProcurement={procurement} />;
+      case "analytics": return <Analytics expenses={expenses} tasks={tasks} inventory={inventory} />;
+      case "ai": return <AIFeatures />;
+      default: return <Dashboard meetings={meetings} inventory={inventory} notices={notices} tasks={tasks} expenses={expenses} />;
+    }
+  };
 
   if (loading) return <div className="flex items-center justify-center w-screen h-screen text-white bg-black font-mono">LOADING SYSTEM...</div>;
 
