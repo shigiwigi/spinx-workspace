@@ -4,7 +4,7 @@ import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, updateDoc 
 import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 import { db, auth, googleProvider } from "./firebase";
 import { C, useFonts } from "./theme";
-import { Avatar, XMark, PrimaryBtn } from "./components/Primitives";
+import { Avatar, XMark, PrimaryBtn, Badge } from "./components/Primitives";
 import { NAV } from "./data";
 
 import { Dashboard } from "./components/views/Dashboard";
