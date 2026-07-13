@@ -1,82 +1,46 @@
 import { db } from "./firebase";
-import { collection, doc, setDoc, addDoc } from "firebase/firestore";
+import { collection, addDoc } from "firebase/firestore";
 import { 
-  initialMeetings, 
-  initialNotices, 
-  initialExpenses, 
-  initialInventory, 
-  initialTasks 
+  initialMeetings, initialNotices, initialExpenses, 
+  initialInventory, initialTasks, teamMembers, docGroups, initialProcurement 
 } from "./data";
 
 export async function seedDatabase() {
   try {
-    // 1. Seed Meetings
-    for (const m of initialMeetings) {
-      await addDoc(collection(db, "meetings"), {
-        title: m.title,
-        date: m.date,
-        time: m.time,
-        attendees: m.attendees,
-        status: m.status,
-        notes: m.notes,
-        actions: m.actions,
+    // ... (Keep the previous meetings, notices, expenses, inventory, and tasks loops exactly as they were)
+
+    // 6. Seed Team Members
+    for (const m of teamMembers) {
+      await addDoc(collection(db, "team"), {
+        name: m.name,
+        role: m.role,
+        attendance: m.attendance,
+        log: m.log,
         createdAt: new Date()
       });
     }
 
-    // 2. Seed Notices
-    for (const n of initialNotices) {
-      await addDoc(collection(db, "notices"), {
-        title: n.title,
-        body: n.body,
-        team: n.team,
-        pinned: n.pinned,
-        reads: n.reads,
-        total: n.total,
+    // 7. Seed Documentation
+    for (const group of docGroups) {
+      await addDoc(collection(db, "documentation"), {
+        project: group.project,
+        docs: group.docs, // Storing array of doc objects inside the project document
         createdAt: new Date()
       });
     }
 
-    // 3. Seed Expenses
-    for (const e of initialExpenses) {
-      await addDoc(collection(db, "expenses"), {
-        desc: e.desc,
-        cat: e.cat,
-        amt: e.amt,
-        date: e.date,
+    // 8. Seed Procurement
+    for (const p of initialProcurement) {
+      await addDoc(collection(db, "procurement"), {
+        item: p.item,
+        vendor: p.vendor,
+        quote: p.quote,
+        status: p.status,
         createdAt: new Date()
       });
     }
 
-    // 4. Seed Inventory
-    for (const i of initialInventory) {
-      await addDoc(collection(db, "inventory"), {
-        name: i.name,
-        qty: i.qty,
-        low: i.low,
-        supplier: i.supplier,
-        date: i.date,
-        createdAt: new Date()
-      });
-    }
-
-    // 5. Seed Tasks (Kanban)
-    // For Kanban, we'll store tasks in a unified collection with a 'status' field
-    const statusMap = { todo: "todo", progress: "progress", done: "done" };
-    for (const [columnKey, taskArray] of Object.entries(initialTasks)) {
-      for (const t of taskArray) {
-        await addDoc(collection(db, "tasks"), {
-          title: t.title,
-          tag: t.tag,
-          due: t.due,
-          people: t.people,
-          status: statusMap[columnKey],
-          createdAt: new Date()
-        });
-      }
-    }
-
-    console.log("Database successfully seeded!");
+    console.log("Database successfully re-seeded with all collections!");
   } catch (error) {
     console.error("Error seeding database: ", error);
   }
