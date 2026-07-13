@@ -1,149 +1,240 @@
-import React, { useState } from "react";
-import { Plus, CheckCircle2, ThumbsUp, AlertCircle } from "lucide-react";
-import { doc, updateDoc, collection, addDoc, increment } from "firebase/firestore";
-import { db } from "../../firebase";
-import { C, clipCorner } from "../../theme";
-import { SectionHeader, Badge, Avatar, Card } from "../Primitives";
+import React, { useState, useEffect } from "react";
+import { Search, Bell, ChevronRight, ChevronLeft, Sparkles, LogOut, Award, Users } from "lucide-react";
+import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
+import { db, auth, googleProvider } from "./firebase";
+import { C, useFonts } from "./theme";
+import { Avatar, XMark, PrimaryBtn, Badge, Card } from "./components/Primitives";
+import { NAV } from "./data";
 
-export function Projects({ liveTasks = { todo: [], progress: [], done: [], completed: [] }, userRole, userId }) {
-  const [dragId, setDragId] = useState(null);
-  const [dragFrom, setDragFrom] = useState(null);
-  const [drafts, setDrafts] = useState({ todo: "", progress: "" });
-  const [selectedValue, setSelectedValue] = useState(750);
+import { Dashboard } from "./components/views/Dashboard";
+import { Meetings } from "./components/views/Meetings";
+import { Notices } from "./components/views/Notices";
+import { Finance } from "./components/views/Finance";
+import { Inventory } from "./components/views/Inventory";
+import { Projects } from "./components/views/Projects";
+import { Team } from "./components/views/Team";
+import { Documentation } from "./components/views/Documentation";
+import { Procurement } from "./components/views/Procurement";
+import { Analytics } from "./components/views/Analytics";
+import { AIFeatures } from "./components/views/AIFeatures";
 
-  // Available points matrices matching our Work Structure guideline document
-  const pointOptions = [
-    { label: "Weekly Report / Feedback (750 pts)", val: 750 },
-    { label: "Idea Submission (750 pts)", val: 750 },
-    { label: "Work & Role Duties (1500 pts)", val: 1500 },
-    { label: "Event Attendance (500 pts)", val: 500 },
-    { label: "Leading Workshops (500 pts)", val: 500 },
-    { label: "Overall Performance / Extras (500 pts)", val: 500 }
-  ];
+export default function SpinXWorkspace() {
+  useFonts();
+  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState({ role: "Presenter", points: 0 });
+  const [allUsers, setAllUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [active, setActive] = useState("dashboard");
+  const [collapsed, setCollapsed] = useState(false);
 
-  const cols = [
-    { key: "todo", label: "To Do" }, 
-    { key: "progress", label: "In Progress" }, 
-    { key: "done", label: "Done (Reviewing)" },
-    { key: "completed", label: "Completed" }
-  ];
+  const [meetings, setMeetings] = useState([]);
+  const [notices, setNotices] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [inventory, setInventory] = useState([]);
+  const [tasks, setTasks] = useState({ todo: [], progress: [], done: [], completed: [] });
+  const [team, setTeam] = useState([]);
+  const [docs, setDocs] = useState([]);
+  const [procurement, setProcurement] = useState([]);
 
-  const onDrop = async (colKey) => {
-    if (dragId == null || dragFrom == null || dragFrom === colKey) return;
-    
-    // Safety restriction: Regular members cannot drag items into completed manually
-    if (colKey === "completed") return; 
-
-    // Safety restriction: Presenters/Media/Ops cannot manage engineering Kanban flows
-    if (["Presenter", "Media", "Operations"].includes(userRole)) return;
-
-    await updateDoc(doc(db, "tasks", dragId), { status: colKey });
-    setDragId(null); setDragFrom(null);
-  };
-
-  const addTask = async (colKey) => {
-    const title = drafts[colKey];
-    if (!title?.trim()) return;
-    
-    await addDoc(collection(db, "tasks"), {
-      title,
-      tag: "Feature",
-      due: "TBD",
-      assignedTo: userId,
-      pointsValue: Number(selectedValue),
-      status: colKey,
-      createdAt: new Date()
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+        const uDocRef = doc(db, "users", currentUser.uid);
+        const uSnap = await getDoc(uDocRef);
+        
+        if (uSnap.exists()) {
+          setProfile(uSnap.data());
+        } else {
+          const initialData = {
+            uid: currentUser.uid,
+            name: currentUser.displayName || "Anonymous",
+            email: currentUser.email,
+            role: currentUser.email === "shigiwigi@gmail.com" ? "Head Developer" : "Presenter", 
+            points: 0,
+            createdAt: new Date()
+          };
+          await setDoc(uDocRef, initialData);
+          setProfile(initialData);
+        }
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
     });
-    setDrafts({ ...drafts, [colKey]: "" });
-  };
+    return () => unsubscribeAuth();
+  }, []);
 
-  const approveTask = async (taskId, workerId, pts) => {
-    if (userRole !== "Owner") return;
-    
-    // 1. Mark task as fully finalized
-    await updateDoc(doc(db, "tasks", taskId), { status: "completed" });
+  useEffect(() => {
+    if (!user) return;
 
-    // 2. Safely credit points directly into the worker's user document
-    await updateDoc(doc(db, "users", workerId), {
-      points: increment(pts)
+    // Stream all authenticated site members dynamically
+    const unsubUsers = onSnapshot(collection(db, "users"), (s) => {
+      setAllUsers(s.docs.map(d => ({ id: d.id, ...d.data() })));
     });
+
+    const unsubTasks = onSnapshot(query(collection(db, "tasks"), orderBy("createdAt", "desc")), (s) => {
+      const all = s.docs.map(d => ({ id: d.id, ...d.data() }));
+      setTasks({
+        todo: all.filter(t => t.status === "todo"),
+        progress: all.filter(t => t.status === "progress"),
+        done: all.filter(t => t.status === "done"),
+        completed: all.filter(t => t.status === "completed")
+      });
+    });
+
+    const unsubMeetings = onSnapshot(query(collection(db, "meetings"), orderBy("createdAt", "desc")), (s) => setMeetings(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubNotices = onSnapshot(query(collection(db, "notices"), orderBy("createdAt", "desc")), (s) => setNotices(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubExpenses = onSnapshot(query(collection(db, "expenses"), orderBy("createdAt", "desc")), (s) => setExpenses(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubInventory = onSnapshot(query(collection(db, "inventory"), orderBy("createdAt", "desc")), (s) => setInventory(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubTeam = onSnapshot(query(collection(db, "team"), orderBy("createdAt", "asc")), (s) => setTeam(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubDocs = onSnapshot(query(collection(db, "documentation"), orderBy("createdAt", "asc")), (s) => setDocs(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubProcure = onSnapshot(query(collection(db, "procurement"), orderBy("createdAt", "desc")), (s) => setProcurement(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+    return () => {
+      unsubUsers(); unsubMeetings(); unsubNotices(); unsubExpenses(); 
+      unsubInventory(); unsubTasks(); unsubTeam(); unsubDocs(); unsubProcure();
+    };
+  }, [user]);
+
+  const handleUpdateRole = async (targetUid, newRole) => {
+    if (profile.role !== "Owner" && profile.role !== "Head Developer") return;
+    await updateDoc(doc(db, "users", targetUid), { role: newRole });
   };
+
+  const handleRedeemPoints = async () => {
+    if (profile.role === "Owner" || profile.points < 5000) return;
+    await updateDoc(doc(db, "users", user.uid), { points: 0 });
+    setProfile(prev => ({ ...prev, points: 0 }));
+    alert("₹5,000 cash payment redemption flag triggered to Owner!");
+  };
+
+  const handleLogin = async () => { try { await signInWithPopup(auth, googleProvider); } catch (e) { console.error(e); } };
+  const handleLogout = async () => { try { await signOut(auth); setActive("dashboard"); } catch (e) { console.error(e); } };
+
+  const allowedNav = NAV.filter(n => {
+    if (profile.role === "Owner" || profile.role === "Head Developer") return true;
+    if (profile.role === "Developer") return !["finance"].includes(n.id);
+    if (profile.role === "Operations") return !["finance", "docs"].includes(n.id);
+    if (profile.role === "Media") return ["dashboard", "notices", "team"].includes(n.id);
+    if (profile.role === "Presenter") return ["dashboard", "meetings", "notices"].includes(n.id);
+    return false;
+  });
 
   return (
-    <div>
-      <SectionHeader title="Projects & Operations" subtitle="Track features and task metrics." />
-      
-      {/* Task Creation Tool Area (Restricted to Builders) */}
-      {["Head Developer", "Developer", "Owner"].includes(userRole) && (
-        <Card className="mb-4 p-4">
-          <div className="flex gap-4 items-center">
-            <select 
-              value={selectedValue} 
-              onChange={e => setSelectedValue(e.target.value)}
-              className="bg-transparent border px-3 py-1.5 text-xs outline-none text-white" 
-              style={{ borderColor: C.border, background: C.surface }}
-            >
-              {pointOptions.map((o, idx) => <option key={idx} value={o.val}>{o.label}</option>)}
-            </select>
-          </div>
-        </Card>
-      )}
+    <div className="flex w-full" style={{ height: "100vh", background: C.bg, fontFamily: "Inter" }}>
+      {/* SIDEBAR */}
+      <div className="flex flex-col shrink-0" style={{ width: collapsed ? 68 : 232, background: C.surface, borderRight: `1px solid ${C.border}` }}>
+        <div className="flex items-center gap-2.5 px-4 h-16 shrink-0 border-b" style={{ borderColor: C.border }}>
+          <XMark size={20} strokeWidth={4} />
+          {!collapsed && <span className="text-white font-bold text-sm tracking-wider">SPINX ENGINE</span>}
+        </div>
 
-      <div className="grid grid-cols-4 gap-4">
-        {cols.map(col => (
-          <div key={col.key} onDragOver={e => e.preventDefault()} onDrop={() => onDrop(col.key)}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div style={{ width: 6, height: 6, background: col.key === "completed" ? C.success : col.key === "done" ? C.gold : C.textFaint }} />
-                <span className="text-xs uppercase tracking-wider font-medium" style={{ color: C.textDim, fontFamily: "Rajdhani" }}>{col.label}</span>
-                <span className="text-[11px]" style={{ color: C.textFaint, fontFamily: "JetBrains Mono" }}>{liveTasks[col.key]?.length || 0}</span>
+        <div className="flex-1 py-3 px-2.5 space-y-0.5 overflow-y-auto">
+          {allowedNav.map(n => {
+            const isActive = active === n.id;
+            return (
+              <button key={n.id} onClick={() => setActive(n.id)} className="w-full flex items-center gap-3 px-2.5 py-2.5 relative text-neutral-400 hover:text-white"
+                style={{ background: isActive ? C.goldSoft : "transparent", color: isActive ? C.gold : "" }}>
+                <n.icon size={16} />
+                {!collapsed && <span className="text-sm font-semibold">{n.label}</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="p-2.5 shrink-0 border-t" style={{ borderColor: C.border }}>
+          <button onClick={() => setCollapsed(!collapsed)} className="w-full text-center text-xs text-neutral-500">
+            {collapsed ? "Expand" : "Collapse menu"}
+          </button>
+        </div>
+      </div>
+
+      {/* MAIN CONTAINER */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex items-center gap-4 px-6 h-16 shrink-0 border-b" style={{ borderColor: C.border, background: C.bg }}>
+          
+          {/* Dynamic Score Indicator (Hidden for Owner) */}
+          {profile.role !== "Owner" && (
+            <div className="flex items-center gap-3 bg-neutral-900 px-3 py-1.5 border border-neutral-800 rounded">
+              <Award size={14} className="text-amber-400" />
+              <div className="text-xs font-semibold text-neutral-300">
+                Score: <span className="text-white font-mono">{profile.points || 0}</span> / 5000 PTS
+              </div>
+              {profile.points >= 5000 && (
+                <button onClick={handleRedeemPoints} className="text-[10px] uppercase font-bold px-2 py-0.5 bg-amber-500 text-black rounded ml-1">
+                  Redeem ₹5k
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="ml-auto flex items-center gap-4 text-white">
+            <Badge tone="gold">{profile.role}</Badge>
+            <button onClick={handleLogout} className="text-neutral-400 hover:text-white"><LogOut size={16} /></button>
+            <div className="flex items-center gap-2">
+              <img src={user.photoURL} className="w-8 h-8 rounded-full border border-neutral-800" alt="avatar" />
+              <div className="text-left">
+                <div className="text-xs font-bold leading-none">{user.displayName}</div>
+                <div className="text-[10px] text-neutral-500">{user.email}</div>
               </div>
             </div>
+          </div>
+        </div>
 
-            <div className="space-y-2.5 min-h-[120px] border border-dashed p-2" style={{ borderColor: C.border }}>
-              {liveTasks[col.key]?.map(t => (
-                <div key={t.id} draggable={!["completed", "done"].includes(col.key) && !["Presenter", "Media", "Operations"].includes(userRole)} 
-                  onDragStart={() => { setDragId(t.id); setDragFrom(col.key); }}
-                  className="p-3 border bg-neutral-900"
-                  style={{ borderColor: C.border, ...clipCorner(10) }}>
-                  
-                  <div className="flex items-center justify-between mb-2">
-                    <Badge tone={col.key === "completed" ? "success" : "default"}>{t.pointsValue} PTS</Badge>
-                    {col.key === "completed" && <CheckCircle2 size={13} style={{ color: C.success }} />}
-                  </div>
-
-                  <div className="text-sm mb-2.5 text-white" style={{ fontFamily: "Inter" }}>{t.title}</div>
-                  
-                  {/* Owner Action Panel Layout */}
-                  {col.key === "done" && userRole === "Owner" && (
-                    <button 
-                      onClick={() => approveTask(t.id, t.assignedTo, t.pointsValue)}
-                      className="mt-2 w-full flex items-center justify-center gap-2 text-xs py-1 px-2 border rounded border-emerald-500/30 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors"
-                    >
-                      <ThumbsUp size={12} /> Approve & Credit Points
-                    </button>
-                  )}
-
-                  {col.key === "done" && userRole !== "Owner" && (
-                    <div className="flex items-center gap-1.5 text-[10px] text-amber-400 bg-amber-500/5 px-2 py-1 border border-amber-500/10">
-                      <AlertCircle size={10} /> Awaiting Owner Approval
-                    </div>
-                  )}
+        {/* Dynamic System Subview Active Router */}
+        <div className="flex-1 overflow-y-auto p-6 bg-black">
+          {active === "team" ? (
+            <div>
+              <Team liveTeam={team} />
+              
+              {/* Site Member Administrative Matrix Panel */}
+              {["Owner", "Head Developer"].includes(profile.role) && (
+                <div className="mt-8">
+                  <div className="text-white font-bold text-sm uppercase tracking-wider mb-3 font-mono">System Core Access Controls</div>
+                  <Card className="p-0 overflow-hidden border border-neutral-800">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-neutral-900 text-neutral-400 border-b border-neutral-800 font-mono">
+                          <th className="p-3">Member Name</th>
+                          <th className="p-3">Email Handle</th>
+                          <th className="p-3">Score Ledger</th>
+                          <th className="p-3">System Access Privilege</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-800 text-neutral-300">
+                        {allUsers.map((u) => (
+                          <tr key={u.id} className="hover:bg-neutral-900/50">
+                            <td className="p-3 font-semibold text-white">{u.name}</td>
+                            <td className="p-3 font-mono text-neutral-500">{u.email}</td>
+                            <td className="p-3 font-mono text-amber-400 font-semibold">{u.role === "Owner" ? "—" : `${u.points || 0} PTS`}</td>
+                            <td className="p-3">
+                              <select 
+                                value={u.role || "Presenter"}
+                                onChange={(e) => handleUpdateRole(u.id, e.target.value)}
+                                className="bg-neutral-950 border border-neutral-800 px-2 py-1 text-white text-xs outline-none"
+                              >
+                                <option value="Owner">Owner</option>
+                                <option value="Head Developer">Head Developer</option>
+                                <option value="Developer">Developer</option>
+                                <option value="Operations">Operations</option>
+                                <option value="Media">Media</option>
+                                <option value="Presenter">Presenter</option>
+                              </select>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </Card>
                 </div>
-              ))}
+              )}
             </div>
-
-            {/* Inbound Creation Inputs */}
-            {["todo", "progress"].includes(col.key) && ["Head Developer", "Developer", "Owner"].includes(userRole) && (
-              <div className="flex items-center gap-2 mt-2.5">
-                <input value={drafts[col.key] || ""} onChange={e => setDrafts({ ...drafts, [col.key]: e.target.value })}
-                  onKeyDown={e => e.key === "Enter" && addTask(col.key)} placeholder="Add task..."
-                  className="flex-1 bg-transparent border px-2.5 py-1.5 text-xs outline-none text-white" style={{ borderColor: C.border }} />
-                <button onClick={() => addTask(col.key)} className="text-white text-xs">+</button>
-              </div>
-            )}
-          </div>
-        ))}
+          ) : (
+            active === "projects" ? <Projects liveTasks={tasks} userRole={profile.role} userId={user.uid} allMembers={allUsers} /> : renderSection()
+          )}
+        </div>
       </div>
     </div>
   );
