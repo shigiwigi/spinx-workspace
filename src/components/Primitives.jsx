@@ -1,9 +1,9 @@
 import React from "react";
 import { C, FONT, clipCorner } from "../theme";
-import logo from "../assets/spinx-logo.jpeg"; // Imported the uploaded asset logo
+import logo from "../assets/spinx-logo.jpeg";
 
 /* ------------------------------------------------------------------ */
-/* SIGNATURE MARK — utilizes the assets logo file.                  */
+/* SIGNATURE MARK                                                     */
 /* ------------------------------------------------------------------ */
 export function XMark({ size = 20, strokeWidth = 4, color = C.gold }) {
   return (
@@ -15,21 +15,17 @@ export function XMark({ size = 20, strokeWidth = 4, color = C.gold }) {
   );
 }
 
-/** Logo lockup using the real SpinX logo image asset. */
 export function LogoMark({ size = 34 }) {
   return (
     <img 
       src={logo} 
       alt="SpinX Logo"
-      className="object-contain" 
+      className="w-full h-full object-contain" 
       style={{ width: size, height: size }}
     />
   );
 }
 
-/** The recurring spray-streak watermark — one bold gesture, used sparingly
- * as the page's signature (hero corners, empty states) rather than as
- * scattered decoration. */
 export function SprayStreak({ size = 200, opacity = 0.05, style = {} }) {
   return (
     <svg
@@ -115,9 +111,9 @@ export function SectionHeader({ title, subtitle, action }) {
   );
 }
 
-/* ---------------------------------- */
-/* BADGES + BUTTONS                 */
-/* ---------------------------------- */
+/* ------------------------------------------------------------------ */
+/* BADGES + BUTTONS                                                   */
+/* ------------------------------------------------------------------ */
 
 const TONES = {
   default: { bg: C.surface3, fg: C.textDim, bd: C.border },
@@ -189,9 +185,9 @@ export function GhostBtn({ children, icon: Icon, onClick }) {
   );
 }
 
-/* ---------------------------------- */
-/* DATA DISPLAY                     */
-/* ---------------------------------- */
+/* ------------------------------------------------------------------ */
+/* DATA DISPLAY                                                       */
+/* ------------------------------------------------------------------ */
 
 export function Avatar({ name = "?", size = 28 }) {
   const initials = name
