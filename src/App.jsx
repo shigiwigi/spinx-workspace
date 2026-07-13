@@ -51,7 +51,7 @@ export default function SpinXWorkspace() {
             uid: currentUser.uid,
             name: currentUser.displayName || "Anonymous",
             email: currentUser.email,
-            role: currentUser.email === "shigiwigi@gmail.com" ? "Head Developer" : "Presenter", 
+            role: "Presenter", 
             points: 0,
             createdAt: new Date()
           };
@@ -69,7 +69,6 @@ export default function SpinXWorkspace() {
   useEffect(() => {
     if (!user) return;
 
-    // Stream all authenticated site members dynamically
     const unsubUsers = onSnapshot(collection(db, "users"), (s) => {
       setAllUsers(s.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -90,7 +89,7 @@ export default function SpinXWorkspace() {
     const unsubInventory = onSnapshot(query(collection(db, "inventory"), orderBy("createdAt", "desc")), (s) => setInventory(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubTeam = onSnapshot(query(collection(db, "team"), orderBy("createdAt", "asc")), (s) => setTeam(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubDocs = onSnapshot(query(collection(db, "documentation"), orderBy("createdAt", "asc")), (s) => setDocs(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubProcure = onSnapshot(query(collection(db, "procurement"), orderBy("createdAt", "desc")), (s) => setProcurement(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubProcure = onSnapshot(query(query(collection(db, "procurement"), orderBy("createdAt", "desc")), (s) => setProcurement(s.docs.map(d => ({ id: d.id, ...d.data() })))));
 
     return () => {
       unsubUsers(); unsubMeetings(); unsubNotices(); unsubExpenses(); 
@@ -122,13 +121,26 @@ export default function SpinXWorkspace() {
     return false;
   });
 
+  if (loading) return <div className="flex items-center justify-center w-screen h-screen text-white bg-black font-mono">LOADING SYSTEM...</div>;
+
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center w-screen h-screen bg-black">
+        <div className="max-w-md w-full border border-neutral-800 p-8 text-center bg-neutral-900">
+          <div className="text-xl font-bold tracking-widest text-white mb-6 font-mono">SPINX WORKSPACE</div>
+          <PrimaryBtn onClick={handleLogin}>AUTHENTICATE VIA GOOGLE</PrimaryBtn>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex w-full" style={{ height: "100vh", background: C.bg, fontFamily: "Inter" }}>
       {/* SIDEBAR */}
       <div className="flex flex-col shrink-0" style={{ width: collapsed ? 68 : 232, background: C.surface, borderRight: `1px solid ${C.border}` }}>
         <div className="flex items-center gap-2.5 px-4 h-16 shrink-0 border-b" style={{ borderColor: C.border }}>
           <XMark size={20} strokeWidth={4} />
-          {!collapsed && <span className="text-white font-bold text-sm tracking-wider">SPINX ENGINE</span>}
+          {!collapsed && <span className="text-white font-bold text-sm tracking-wider font-mono">SPINX ENGINE</span>}
         </div>
 
         <div className="flex-1 py-3 px-2.5 space-y-0.5 overflow-y-auto">
@@ -155,7 +167,6 @@ export default function SpinXWorkspace() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex items-center gap-4 px-6 h-16 shrink-0 border-b" style={{ borderColor: C.border, background: C.bg }}>
           
-          {/* Dynamic Score Indicator (Hidden for Owner) */}
           {profile.role !== "Owner" && (
             <div className="flex items-center gap-3 bg-neutral-900 px-3 py-1.5 border border-neutral-800 rounded">
               <Award size={14} className="text-amber-400" />
@@ -174,22 +185,24 @@ export default function SpinXWorkspace() {
             <Badge tone="gold">{profile.role}</Badge>
             <button onClick={handleLogout} className="text-neutral-400 hover:text-white"><LogOut size={16} /></button>
             <div className="flex items-center gap-2">
-              <img src={user.photoURL} className="w-8 h-8 rounded-full border border-neutral-800" alt="avatar" />
+              {user?.photoURL ? (
+                <img src={user.photoURL} className="w-8 h-8 rounded-full border border-neutral-800" alt="avatar" />
+              ) : (
+                <Avatar name={user?.displayName || "User"} size={32} />
+              )}
               <div className="text-left">
-                <div className="text-xs font-bold leading-none">{user.displayName}</div>
-                <div className="text-[10px] text-neutral-500">{user.email}</div>
+                <div className="text-xs font-bold leading-none">{user?.displayName}</div>
+                <div className="text-[10px] text-neutral-500 font-mono">{user?.email}</div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Dynamic System Subview Active Router */}
         <div className="flex-1 overflow-y-auto p-6 bg-black">
           {active === "team" ? (
             <div>
               <Team liveTeam={team} />
               
-              {/* Site Member Administrative Matrix Panel */}
               {["Owner", "Head Developer"].includes(profile.role) && (
                 <div className="mt-8">
                   <div className="text-white font-bold text-sm uppercase tracking-wider mb-3 font-mono">System Core Access Controls</div>
