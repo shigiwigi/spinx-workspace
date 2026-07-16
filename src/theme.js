@@ -88,6 +88,10 @@ export function useFonts() {
         ::-webkit-scrollbar-thumb:hover { background: ${C.borderStrong}; }
         input::placeholder, textarea::placeholder { color: ${C.textFaint}; }
         input, select, textarea, button { font-family: inherit; }
+        input[type=number] { -moz-appearance: textfield; }
+        input[type=number]::-webkit-outer-spin-button,
+        input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=date] { color-scheme: dark; }
         @keyframes spinxPulse { 0%,100% { opacity: 1 } 50% { opacity: .45 } }
         @keyframes spinxFadeUp { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
       `;

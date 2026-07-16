@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { LogOut, Award, ShieldCheck } from "lucide-react";
+import { LogOut, Award, ShieldCheck, Sparkles, X } from "lucide-react";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 import { db, auth, googleProvider } from "./firebase";
@@ -14,9 +14,7 @@ import { Finance } from "./components/views/Finance";
 import { Inventory } from "./components/views/Inventory";
 import { Projects } from "./components/views/Projects";
 import { Team } from "./components/views/Team";
-import { Documentation } from "./components/views/Documentation";
-import { Procurement } from "./components/views/Procurement";
-import { Analytics } from "./components/views/Analytics";
+import { CalendarView } from "./components/views/Calendar";
 import { AIFeatures } from "./components/views/AIFeatures";
 
 export default function SpinXWorkspace() {
@@ -27,6 +25,7 @@ export default function SpinXWorkspace() {
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState("dashboard");
   const [collapsed, setCollapsed] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
 
   const [meetings, setMeetings] = useState([]);
   const [notices, setNotices] = useState([]);
@@ -35,7 +34,7 @@ export default function SpinXWorkspace() {
   const [tasks, setTasks] = useState({ todo: [], progress: [], done: [], completed: [] });
   const [team, setTeam] = useState([]);
   const [docs, setDocs] = useState([]);
-  const [procurement, setProcurement] = useState([]);
+  const [calendarEvents, setCalendarEvents] = useState([]);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
@@ -89,11 +88,11 @@ export default function SpinXWorkspace() {
     const unsubInventory = onSnapshot(query(collection(db, "inventory"), orderBy("createdAt", "desc")), (s) => setInventory(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubTeam = onSnapshot(query(collection(db, "team"), orderBy("createdAt", "asc")), (s) => setTeam(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubDocs = onSnapshot(query(collection(db, "documentation"), orderBy("createdAt", "asc")), (s) => setDocs(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubProcure = onSnapshot(query(collection(db, "procurement"), orderBy("createdAt", "desc")), (s) => setProcurement(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubCalendar = onSnapshot(query(collection(db, "calendarEvents"), orderBy("date", "asc")), (s) => setCalendarEvents(s.docs.map(d => ({ id: d.id, ...d.data() }))));
 
     return () => {
       unsubUsers(); unsubMeetings(); unsubNotices(); unsubExpenses();
-      unsubInventory(); unsubTasks(); unsubTeam(); unsubDocs(); unsubProcure();
+      unsubInventory(); unsubTasks(); unsubTeam(); unsubDocs(); unsubCalendar();
     };
   }, [user]);
 
@@ -115,26 +114,23 @@ export default function SpinXWorkspace() {
   const allowedNav = NAV.filter(n => {
     if (profile.role === "Owner" || profile.role === "Head Developer") return true;
     if (profile.role === "Developer") return !["finance"].includes(n.id);
-    if (profile.role === "Operations") return !["finance", "docs"].includes(n.id);
-    if (profile.role === "Media") return ["dashboard", "notices", "team"].includes(n.id);
-    if (profile.role === "Presenter") return ["dashboard", "meetings", "notices"].includes(n.id);
+    if (profile.role === "Operations") return !["finance"].includes(n.id);
+    if (profile.role === "Media") return ["dashboard", "notices", "team", "calendar"].includes(n.id);
+    if (profile.role === "Presenter") return ["dashboard", "meetings", "notices", "calendar"].includes(n.id);
     return false;
   });
 
   const renderSection = () => {
     switch (active) {
-      case "dashboard": return <Dashboard meetings={meetings} inventory={inventory} notices={notices} tasks={tasks} expenses={expenses} />;
+      case "dashboard": return <Dashboard meetings={meetings} inventory={inventory} notices={notices} tasks={tasks} expenses={expenses} profile={profile} userId={user?.uid} team={team} />;
       case "meetings": return <Meetings liveMeetings={meetings} />;
       case "notices": return <Notices liveNotices={notices} />;
+      case "calendar": return <CalendarView liveEvents={calendarEvents} />;
       case "finance": return <Finance liveExpenses={expenses} />;
-      case "inventory": return <Inventory liveInventory={inventory} />;
+      case "inventory": return <Inventory liveInventory={inventory} liveDocs={docs} />;
       case "projects": return <Projects liveTasks={tasks} userRole={profile.role} userId={user.uid} allMembers={allUsers} />;
       case "team": return <Team liveTeam={team} />;
-      case "docs": return <Documentation liveDocs={docs} />;
-      case "procurement": return <Procurement liveProcurement={procurement} />;
-      case "analytics": return <Analytics expenses={expenses} tasks={tasks} inventory={inventory} />;
-      case "ai": return <AIFeatures />;
-      default: return <Dashboard meetings={meetings} inventory={inventory} notices={notices} tasks={tasks} expenses={expenses} />;
+      default: return <Dashboard meetings={meetings} inventory={inventory} notices={notices} tasks={tasks} expenses={expenses} profile={profile} userId={user?.uid} team={team} />;
     }
   };
 
@@ -175,13 +171,8 @@ export default function SpinXWorkspace() {
     <div className="flex w-full" style={{ height: "100vh", background: C.bg, fontFamily: FONT.body }}>
       {/* SIDEBAR */}
       <div className="flex flex-col shrink-0 transition-all" style={{ width: collapsed ? 68 : 232, background: C.bgRaised, borderRight: `1px solid ${C.border}` }}>
-        <div className="flex items-center gap-2.5 px-4 h-16 shrink-0 border-b" style={{ borderColor: C.border }}>
-          <LogoMark size={30} />
-          {!collapsed && (
-            <span className="text-sm tracking-[0.15em]" style={{ fontFamily: FONT.display, color: C.text, fontWeight: 700 }}>
-              SPIN<span style={{ color: C.gold }}>X</span>
-            </span>
-          )}
+        <div className="flex items-center justify-center px-4 h-16 shrink-0 border-b" style={{ borderColor: C.border }}>
+          <LogoMark size={collapsed ? 32 : 46} />
         </div>
 
         <div className="flex-1 py-3 px-2.5 space-y-0.5 overflow-y-auto">
@@ -307,6 +298,39 @@ export default function SpinXWorkspace() {
           )}
         </div>
       </div>
+
+      {/* FLOATING AI ASSISTANT */}
+      {!aiOpen && (
+        <button
+          onClick={() => setAiOpen(true)}
+          className="fixed z-40 flex items-center justify-center transition-transform"
+          style={{
+            bottom: 22, right: 22, width: 50, height: 50,
+            background: C.gold, color: "#15110A",
+            clipPath: "polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)",
+            boxShadow: "0 4px 18px rgba(254,192,45,0.35)",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.06)")}
+          onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+        >
+          <Sparkles size={20} />
+        </button>
+      )}
+
+      {aiOpen && (
+        <div className="fixed z-40 flex flex-col" style={{ bottom: 22, right: 22, width: 360, maxHeight: "70vh", background: C.bgRaised, border: `1px solid ${C.border}`, boxShadow: "0 10px 40px rgba(0,0,0,0.5)" }}>
+          <div className="flex items-center justify-between px-4 h-12 shrink-0 border-b" style={{ borderColor: C.border }}>
+            <div className="flex items-center gap-2">
+              <Sparkles size={14} style={{ color: C.gold }} />
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: C.text, fontFamily: FONT.head }}>AI Assistant</span>
+            </div>
+            <button onClick={() => setAiOpen(false)}><X size={16} style={{ color: C.textFaint }} /></button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            <AIFeatures />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -29,17 +29,6 @@ export async function seedDatabase() {
       });
     }
 
-    // 8. Seed Procurement
-    for (const p of initialProcurement) {
-      await addDoc(collection(db, "procurement"), {
-        item: p.item,
-        vendor: p.vendor,
-        quote: p.quote,
-        status: p.status,
-        createdAt: new Date()
-      });
-    }
-
     console.log("Database successfully re-seeded with all collections!");
   } catch (error) {
     console.error("Error seeding database: ", error);

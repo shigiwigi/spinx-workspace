@@ -3,6 +3,7 @@ import { AlertCircle, Rocket } from "lucide-react";
 import { doc, updateDoc, collection, addDoc, increment } from "firebase/firestore";
 import { db } from "../../firebase";
 import { C, FONT, clipCorner } from "../../theme";
+import { TEAMS } from "../../data";
 import { SectionHeader, Badge, Card, Avatar, PrimaryBtn } from "../Primitives";
 
 export function Projects({ liveTasks = { todo: [], progress: [], done: [], completed: [] }, userRole, userId, allMembers = [] }) {
@@ -11,12 +12,15 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
   const [dragOverCol, setDragOverCol] = useState(null);
   const [draft, setDraft] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("GENERAL TASKS");
+  const [selectedTeam, setSelectedTeam] = useState(TEAMS[0]);
   const [selectedAssignee, setSelectedAssignee] = useState(userId);
   const [reviewPoints, setReviewPoints] = useState({});
   const [reviewFeedback, setReviewFeedback] = useState({});
+  const [teamFilter, setTeamFilter] = useState("All");
 
   const categories = ["REVIEW", "GENERAL TASKS", "Bonus Structure"];
   const categoryTone = { REVIEW: "info", "GENERAL TASKS": "default", "Bonus Structure": "gold" };
+  const teamTone = { Mechanical: "default", Firmware: "info", Software: "gold", "Workshop Ops": "success", "Finance/Procurement": "danger" };
   const cols = [
     { key: "todo", label: "To Do" },
     { key: "progress", label: "In Progress" },
@@ -45,6 +49,7 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
     await addDoc(collection(db, "tasks"), {
       title: draft.trim(),
       category: selectedCategory,
+      team: selectedTeam,
       assignedToId: selectedAssignee,
       assignedToName: targetAssignee.name,
       status: "todo",
@@ -93,7 +98,7 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
               Initialize operation task
             </span>
           </div>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-5 gap-3">
             <input
               value={draft}
               onChange={e => setDraft(e.target.value)}
@@ -102,6 +107,14 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
               className="col-span-2 border px-3 py-2 text-xs outline-none"
               style={inputStyle}
             />
+            <select
+              value={selectedTeam}
+              onChange={e => setSelectedTeam(e.target.value)}
+              className="border px-2 py-2 text-xs outline-none"
+              style={{ ...inputStyle, fontFamily: FONT.head }}
+            >
+              {TEAMS.map((t, i) => <option key={i} value={t} style={{ background: C.surface }}>{t}</option>)}
+            </select>
             <select
               value={selectedCategory}
               onChange={e => setSelectedCategory(e.target.value)}
@@ -126,10 +139,20 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
         </Card>
       )}
 
+      {/* TEAM FILTER */}
+      <div className="flex items-center gap-2 mb-4">
+        {["All", ...TEAMS].map(t => (
+          <button key={t} onClick={() => setTeamFilter(t)} className="px-3 py-1.5 text-[11px] font-semibold border transition-colors"
+            style={{ background: teamFilter === t ? C.goldSoft : "transparent", borderColor: teamFilter === t ? C.goldLine : C.border, color: teamFilter === t ? C.gold : C.textDim, fontFamily: FONT.head }}>
+            {t}
+          </button>
+        ))}
+      </div>
+
       {/* KANBAN BOARD */}
       <div className="grid grid-cols-4 gap-4">
         {cols.map(col => {
-          const items = liveTasks[col.key] || [];
+          const items = (liveTasks[col.key] || []).filter(t => teamFilter === "All" || t.team === teamFilter);
           const isDropTarget = dragOverCol === col.key && dragFrom !== col.key && col.key !== "completed";
           return (
             <div
@@ -176,7 +199,10 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
                     }}
                   >
                     <div className="flex items-center justify-between mb-2 gap-2">
-                      <Badge tone={categoryTone[t.category] || "default"}>{t.category || "GENERAL"}</Badge>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Badge tone={categoryTone[t.category] || "default"}>{t.category || "GENERAL"}</Badge>
+                        {t.team && <Badge tone={teamTone[t.team] || "default"}>{t.team}</Badge>}
+                      </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <Avatar name={t.assignedToName || "?"} size={18} />
                         <span className="text-[10px] truncate max-w-[70px]" style={{ color: C.textFaint, fontFamily: FONT.body }}>{t.assignedToName}</span>

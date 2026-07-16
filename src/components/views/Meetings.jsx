@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Check, Clock, ChevronDown, CircleDot, CalendarClock } from "lucide-react";
+import { Plus, Check, Clock, ChevronDown, CircleDot, CalendarClock, Video } from "lucide-react";
 import { collection, addDoc, doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import { C, FONT } from "../../theme";
@@ -10,7 +10,7 @@ const inputStyle = { borderColor: C.border, background: "transparent", color: C.
 export function Meetings({ liveMeetings = [] }) {
   const [expanded, setExpanded] = useState(null);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: "", date: "", time: "", attendees: "" });
+  const [form, setForm] = useState({ title: "", date: "", time: "", attendees: "", meetLink: "" });
   const [actionDraft, setActionDraft] = useState("");
 
   const addMeeting = async () => {
@@ -20,12 +20,13 @@ export function Meetings({ liveMeetings = [] }) {
       date: form.date || "TBD",
       time: form.time || "—",
       attendees: form.attendees.split(",").map(s => s.trim()).filter(Boolean),
+      meetLink: form.meetLink.trim() || "",
       status: "Scheduled",
       notes: "",
       actions: [],
       createdAt: new Date()
     });
-    setForm({ title: "", date: "", time: "", attendees: "" });
+    setForm({ title: "", date: "", time: "", attendees: "", meetLink: "" });
     setShowForm(false);
   };
 
@@ -56,7 +57,9 @@ export function Meetings({ liveMeetings = [] }) {
             <input placeholder="2:00 PM" value={form.time} onChange={e => setForm({ ...form, time: e.target.value })}
               className="border px-3 py-2 text-sm outline-none" style={{ ...inputStyle, fontFamily: FONT.mono }} />
             <input placeholder="Attendees (comma separated)" value={form.attendees} onChange={e => setForm({ ...form, attendees: e.target.value })}
-              className="col-span-3 border px-3 py-2 text-sm outline-none" style={inputStyle} />
+              className="col-span-2 border px-3 py-2 text-sm outline-none" style={inputStyle} />
+            <input placeholder="Google Meet link" value={form.meetLink} onChange={e => setForm({ ...form, meetLink: e.target.value })}
+              className="border px-3 py-2 text-sm outline-none" style={inputStyle} />
             <PrimaryBtn onClick={addMeeting} icon={Check}>Save</PrimaryBtn>
           </div>
         </Card>
@@ -87,6 +90,13 @@ export function Meetings({ liveMeetings = [] }) {
                     </div>
                   </div>
                 </div>
+                {m.meetLink && (
+                  <a href={m.meetLink} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold shrink-0"
+                    style={{ background: C.goldSoft, color: C.gold, border: `1px solid ${C.goldLine}`, fontFamily: FONT.head }}>
+                    <Video size={12} /> Join Meet
+                  </a>
+                )}
                 <Badge tone={m.status === "Completed" ? "success" : "gold"}>{m.status}</Badge>
                 <ChevronDown size={16} style={{ color: C.textFaint, transform: expanded === m.id ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
               </div>

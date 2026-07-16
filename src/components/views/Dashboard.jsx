@@ -1,9 +1,9 @@
 import React from "react";
-import { Kanban as KanbanIcon, Clock, Wallet, AlertTriangle, Radio } from "lucide-react";
+import { Kanban as KanbanIcon, Clock, Wallet, AlertTriangle, Radio, Award, CalendarCheck2, ListChecks } from "lucide-react";
 import { C, FONT } from "../../theme";
 import { Card, Eyebrow, SectionHeader, Badge, ProgressBar, SprayStreak } from "../Primitives";
 
-export function Dashboard({ meetings = [], inventory = [], notices = [], tasks = { todo: [], progress: [], done: [] }, expenses = [] }) {
+export function Dashboard({ meetings = [], inventory = [], notices: _notices = [], tasks = { todo: [], progress: [], done: [], completed: [] }, expenses = [], profile = {}, userId, team = [] }) {
   const activeProjects = (tasks.progress?.length || 0);
   const pendingTasks = (tasks.todo?.length || 0) + (tasks.progress?.length || 0);
   const lowStock = inventory.filter(i => i.qty <= i.low);
@@ -18,9 +18,22 @@ export function Dashboard({ meetings = [], inventory = [], notices = [], tasks =
     { label: "Low Stock Items", value: lowStock.length, delta: lowStock.length ? "needs reorder" : "fully stocked", icon: AlertTriangle, danger: lowStock.length > 0 },
   ];
 
+  const isOwner = profile.role === "Owner";
+  const myTeamRecord = team.find(m => m.name?.toLowerCase() === profile.name?.toLowerCase());
+  const allMyTasks = [...(tasks.todo || []), ...(tasks.progress || []), ...(tasks.done || []), ...(tasks.completed || [])].filter(t => t.assignedToId === userId);
+  const myCompleted = (tasks.completed || []).filter(t => t.assignedToId === userId);
+
   return (
     <div>
-      <SectionHeader title="Dashboard" subtitle="Here's where things stand at SpinX." />
+      <div className="flex items-center justify-between mb-1">
+        <SectionHeader title="Dashboard" subtitle="Here's where things stand at SpinX." />
+      </div>
+      <div className="flex justify-end -mt-4 mb-4">
+        <div className="flex items-center gap-1.5 px-2.5 py-1" style={{ background: C.successSoft, border: `1px solid rgba(48,164,108,0.28)` }}>
+          <Radio size={11} style={{ color: C.success }} />
+          <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: C.success, fontFamily: FONT.head }}>System link: Online</span>
+        </div>
+      </div>
 
       <div className="grid grid-cols-4 gap-4 mb-5">
         {stats.map((s, i) => (
@@ -83,7 +96,7 @@ export function Dashboard({ meetings = [], inventory = [], notices = [], tasks =
         </Card>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-4 mb-5">
         <Card className="col-span-2">
           <div className="flex items-center gap-2 mb-1">
             <Radio size={13} style={{ color: C.gold }} />
@@ -111,6 +124,41 @@ export function Dashboard({ meetings = [], inventory = [], notices = [], tasks =
           </div>
         </Card>
       </div>
+
+      {/* PERSONAL ANALYTICS — everyone except Owner */}
+      {!isOwner && (
+        <Card className="relative overflow-hidden" tag>
+          <SprayStreak size={160} opacity={0.03} style={{ top: -30, right: -20 }} />
+          <Eyebrow>Your performance</Eyebrow>
+          <div className="relative grid grid-cols-4 gap-4 mt-4">
+            <div className="border-t pt-3" style={{ borderColor: C.border }}>
+              <CalendarCheck2 size={14} style={{ color: C.gold }} className="mb-2" />
+              <div className="text-xl" style={{ fontFamily: FONT.mono, color: C.text }}>{myTeamRecord ? `${myTeamRecord.attendance}%` : "—"}</div>
+              <div className="text-[11px] mt-1" style={{ color: C.textFaint, fontFamily: FONT.head }}>Attendance</div>
+            </div>
+            <div className="border-t pt-3" style={{ borderColor: C.border }}>
+              <Award size={14} style={{ color: C.gold }} className="mb-2" />
+              <div className="text-xl" style={{ fontFamily: FONT.mono, color: C.text }}>{profile.points || 0}</div>
+              <div className="text-[11px] mt-1" style={{ color: C.textFaint, fontFamily: FONT.head }}>Score points</div>
+            </div>
+            <div className="border-t pt-3" style={{ borderColor: C.border }}>
+              <ListChecks size={14} style={{ color: C.gold }} className="mb-2" />
+              <div className="text-xl" style={{ fontFamily: FONT.mono, color: C.text }}>{myCompleted.length}</div>
+              <div className="text-[11px] mt-1" style={{ color: C.textFaint, fontFamily: FONT.head }}>Tasks completed</div>
+            </div>
+            <div className="border-t pt-3" style={{ borderColor: C.border }}>
+              <KanbanIcon size={14} style={{ color: C.gold }} className="mb-2" />
+              <div className="text-xl" style={{ fontFamily: FONT.mono, color: C.text }}>{allMyTasks.length}</div>
+              <div className="text-[11px] mt-1" style={{ color: C.textFaint, fontFamily: FONT.head }}>Total contributions</div>
+            </div>
+          </div>
+          {!myTeamRecord && (
+            <div className="relative mt-3 text-[11px]" style={{ color: C.textFaint, fontFamily: FONT.body }}>
+              Attendance not tracked yet — ask an Owner to add you in the Team directory.
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   );
 }
