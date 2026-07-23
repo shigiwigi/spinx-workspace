@@ -109,12 +109,13 @@ export default function SpinXWorkspace() {
   const handleLogin = async () => { try { await signInWithPopup(auth, googleProvider); } catch (e) { console.error(e); } };
   const handleLogout = async () => { try { await signOut(auth); setActive("dashboard"); } catch (e) { console.error(e); } };
 
+  // Role-Based Navigation Filtering
   const allowedNav = (NAV || []).filter(n => {
     if (profile.role === "Owner" || profile.role === "Head Developer") return true;
     if (profile.role === "Developer" || profile.role === "Operations") return true;
     if (profile.role === "Media") return ["dashboard", "notices", "team", "calendar"].includes(n.id);
     if (profile.role === "Presenter") return ["dashboard", "meetings", "notices", "calendar"].includes(n.id);
-    return false;
+    return true;
   });
 
   const renderSection = () => {
