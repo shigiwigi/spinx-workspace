@@ -14,6 +14,7 @@ import { Inventory } from "./components/views/Inventory";
 import { Projects } from "./components/views/Projects";
 import { Team } from "./components/views/Team";
 import { CalendarView } from "./components/views/Calendar";
+import { Finance } from "./components/views/Finance";
 import { AIFeatures } from "./components/views/AIFeatures";
 
 export default function SpinXWorkspace() {
@@ -27,6 +28,7 @@ export default function SpinXWorkspace() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
 
+  // Firestore Data States
   const [meetings, setMeetings] = useState([]);
   const [notices, setNotices] = useState([]);
   const [inventory, setInventory] = useState([]);
@@ -34,6 +36,8 @@ export default function SpinXWorkspace() {
   const [team, setTeam] = useState([]);
   const [docs, setDocs] = useState([]);
   const [calendarEvents, setCalendarEvents] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [rolesList, setRolesList] = useState([]); // Dynamic Roles State
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
@@ -64,13 +68,11 @@ export default function SpinXWorkspace() {
     return () => unsubscribeAuth();
   }, []);
 
+  // Central Real-time Listener Hub
   useEffect(() => {
     if (!user) return;
 
-    const unsubUsers = onSnapshot(collection(db, "users"), (s) => {
-      setAllUsers(s.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-
+    const unsubUsers = onSnapshot(collection(db, "users"), (s) => setAllUsers(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubTasks = onSnapshot(query(collection(db, "tasks"), orderBy("createdAt", "desc")), (s) => {
       const all = s.docs.map(d => ({ id: d.id, ...d.data() }));
       setTasks({
@@ -80,17 +82,18 @@ export default function SpinXWorkspace() {
         completed: all.filter(t => t.status === "completed")
       });
     });
-
     const unsubMeetings = onSnapshot(query(collection(db, "meetings"), orderBy("createdAt", "desc")), (s) => setMeetings(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubNotices = onSnapshot(query(collection(db, "notices"), orderBy("createdAt", "desc")), (s) => setNotices(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubInventory = onSnapshot(query(collection(db, "inventory"), orderBy("createdAt", "desc")), (s) => setInventory(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubTeam = onSnapshot(query(collection(db, "team"), orderBy("createdAt", "asc")), (s) => setTeam(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubDocs = onSnapshot(query(collection(db, "documentation"), orderBy("createdAt", "asc")), (s) => setDocs(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubCalendar = onSnapshot(query(collection(db, "calendarEvents"), orderBy("date", "asc")), (s) => setCalendarEvents(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubExpenses = onSnapshot(query(collection(db, "expenses"), orderBy("createdAt", "desc")), (s) => setExpenses(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubRoles = onSnapshot(collection(db, "roles"), (s) => setRolesList(s.docs.map(d => ({ id: d.id, ...d.data() }))));
 
     return () => {
       unsubUsers(); unsubMeetings(); unsubNotices();
-      unsubInventory(); unsubTasks(); unsubTeam(); unsubDocs(); unsubCalendar();
+      unsubInventory(); unsubTasks(); unsubTeam(); unsubDocs(); unsubCalendar(); unsubExpenses(); unsubRoles();
     };
   }, [user]);
 
@@ -111,7 +114,7 @@ export default function SpinXWorkspace() {
 
   const allowedNav = (NAV || []).filter(n => {
     if (profile.role === "Owner" || profile.role === "Head Developer") return true;
-    if (profile.role === "Developer" || profile.role === "Operations") return true;
+    if (profile.role === "Developer" || profile.role === "Operations") return n.id !== "finance";
     if (profile.role === "Media") return ["dashboard", "notices", "team", "calendar"].includes(n.id);
     if (profile.role === "Presenter") return ["dashboard", "meetings", "notices", "calendar"].includes(n.id);
     return true;
@@ -119,14 +122,15 @@ export default function SpinXWorkspace() {
 
   const renderSection = () => {
     switch (active) {
-      case "dashboard": return <Dashboard meetings={meetings} inventory={inventory} notices={notices} tasks={tasks} profile={profile} userId={user?.uid} team={team} />;
+      case "dashboard": return <Dashboard meetings={meetings} inventory={inventory} notices={notices} tasks={tasks} expenses={expenses} profile={profile} userId={user?.uid} team={team} />;
       case "meetings": return <Meetings liveMeetings={meetings} />;
       case "notices": return <Notices liveNotices={notices} />;
       case "calendar": return <CalendarView liveEvents={calendarEvents} />;
       case "inventory": return <Inventory liveInventory={inventory} liveDocs={docs} userRole={profile.role} />;
+      case "finance": return <Finance liveExpenses={expenses} />;
       case "projects": return <Projects liveTasks={tasks} liveTeams={team} userRole={profile.role} userId={user?.uid} profile={profile} allMembers={allUsers} />;
       case "team": return <Team liveTeams={team} allUsers={allUsers} profile={profile} userId={user?.uid} />;
-      default: return <Dashboard meetings={meetings} inventory={inventory} notices={notices} tasks={tasks} profile={profile} userId={user?.uid} team={team} />;
+      default: return <Dashboard meetings={meetings} inventory={inventory} notices={notices} tasks={tasks} expenses={expenses} profile={profile} userId={user?.uid} team={team} />;
     }
   };
 
@@ -304,11 +308,14 @@ export default function SpinXWorkspace() {
                                 style={{ background: C.bg, borderColor: C.border, color: C.text, fontFamily: FONT.body }}
                               >
                                 <option value="Owner">Owner</option>
-                                <option value="Head Developer">Head Developer</option>
-                                <option value="Developer">Developer</option>
-                                <option value="Operations">Operations</option>
-                                <option value="Media">Media</option>
-                                <option value="Presenter">Presenter</option>
+                                {/* Maps custom roles pulled dynamically from Firestore */}
+                                {rolesList.map(r => (
+                                  <option key={r.id} value={r.name}>{r.name}</option>
+                                ))}
+                                {/* Failsafe for unmapped roles */}
+                                {!rolesList.find(r => r.name === u.role) && u.role !== "Owner" && (
+                                  <option value={u.role}>{u.role}</option>
+                                )}
                               </select>
                             </td>
                           </tr>
@@ -342,7 +349,7 @@ export default function SpinXWorkspace() {
       )}
 
       {aiOpen && (
-        <div className="fixed z-50 flex flex-col inset-x-3 bottom-3 sm:inset-auto sm:bottom-5 sm:right-5 sm:w-[360px] maxHeight: '80vh' max-h-[75vh]" style={{ background: C.bgRaised, border: `1px solid ${C.border}`, boxShadow: "0 10px 40px rgba(0,0,0,0.5)" }}>
+        <div className="fixed z-50 flex flex-col inset-x-3 bottom-3 sm:inset-auto sm:bottom-5 sm:right-5 sm:w-[360px] max-h-[75vh]" style={{ background: C.bgRaised, border: `1px solid ${C.border}`, boxShadow: "0 10px 40px rgba(0,0,0,0.5)" }}>
           <div className="flex items-center justify-between px-4 h-11 shrink-0 border-b" style={{ borderColor: C.border }}>
             <div className="flex items-center gap-2">
               <Sparkles size={14} style={{ color: C.gold }} />

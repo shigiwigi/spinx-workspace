@@ -109,7 +109,7 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
     <div>
       <SectionHeader title="Projects & Operations" subtitle="Track tasks, assign categories, and manage owner payouts." />
 
-      {/* TASK CREATION */}
+      {/* TASK CREATION — restricted to builders */}
       {canManageBoard && (
         <Card className="mb-6" tag>
           <div className="flex items-center gap-2 mb-3">
@@ -169,9 +169,8 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
         })}
       </div>
 
-      {/* FIXED KANBAN BOARD GRID */}
-      {/* 1 Col (Phone) -> 2 Cols (Tablet) -> 4 Cols (Desktop) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 pb-4">
+      {/* FIXED KANBAN BOARD GRID: 2x2 Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4">
         {cols.map(col => {
           const items = (liveTasks[col.key] || [])
             .filter(canViewTask)
