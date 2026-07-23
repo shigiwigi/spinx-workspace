@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Users, Plus, Check, Shield, Trash2, Edit2, User } from "lucide-react";
 import { C, FONT } from "../../theme";
-import { Card, SectionHeader, PrimaryBtn, Badge, Avatar } from "../Primitives";
+import { Card, SectionHeader, PrimaryBtn, Badge } from "../Primitives";
 import { db } from "../../firebase";
 import { collection, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore";
 
@@ -13,7 +13,6 @@ export function Team({ liveTeams = [], allUsers = [], profile, userId }) {
   
   const [form, setForm] = useState({ name: "", leadId: "", memberIds: [] });
 
-  // Only Owners, Head Devs, or the specific Team Lead can create/edit a team
   const canManageSystem = profile.role === "Owner" || profile.role === "Head Developer";
   const canEditTeam = (team) => canManageSystem || team.leadId === userId;
 
@@ -54,23 +53,23 @@ export function Team({ liveTeams = [], allUsers = [], profile, userId }) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <SectionHeader title="Workspace Teams" subtitle="Project teams and assigned members." />
         {canManageSystem && (
           <PrimaryBtn icon={Plus} onClick={() => openForm()} small>Assign Team</PrimaryBtn>
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
         {liveTeams.map(team => {
           const leadUser = allUsers.find(u => u.id === team.leadId) || { name: "Unassigned", role: "N/A" };
           const teamMembers = allUsers.filter(u => (team.memberIds || []).includes(u.id));
 
           return (
-            <Card key={team.id} pad="p-5" className="relative">
+            <Card key={team.id} pad="p-4 sm:p-5" className="relative">
               <div className="flex justify-between items-start border-b pb-3 mb-4" style={{ borderColor: C.border }}>
                 <div>
-                  <h3 className="text-lg font-bold" style={{ color: C.gold, fontFamily: FONT.head }}>{team.name}</h3>
+                  <h3 className="text-base sm:text-lg font-bold" style={{ color: C.gold, fontFamily: FONT.head }}>{team.name}</h3>
                   <div className="flex items-center gap-2 mt-1">
                     <Shield size={12} style={{ color: C.textFaint }} />
                     <span className="text-xs" style={{ color: C.textDim, fontFamily: FONT.body }}>Lead: {leadUser.name}</span>
@@ -86,7 +85,7 @@ export function Team({ liveTeams = [], allUsers = [], profile, userId }) {
                 )}
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <div className="text-[10px] uppercase font-bold tracking-wider" style={{ color: C.textFaint, fontFamily: FONT.head }}>
                   Team Members ({teamMembers.length})
                 </div>
@@ -95,9 +94,9 @@ export function Team({ liveTeams = [], allUsers = [], profile, userId }) {
                 ) : (
                   teamMembers.map(m => (
                     <div key={m.id} className="flex items-center justify-between p-2 rounded border" style={{ borderColor: C.border, background: "rgba(255,255,255,0.02)" }}>
-                      <div className="flex items-center gap-2 text-xs" style={{ color: C.text, fontFamily: FONT.body }}>
+                      <div className="flex items-center gap-2 text-xs truncate max-w-[150px]" style={{ color: C.text, fontFamily: FONT.body }}>
                         <User size={13} style={{ color: C.gold }} />
-                        {m.name}
+                        <span className="truncate">{m.name}</span>
                       </div>
                       <Badge>{m.role}</Badge>
                     </div>
@@ -111,15 +110,15 @@ export function Team({ liveTeams = [], allUsers = [], profile, userId }) {
 
       {/* TEAM CREATION / EDIT MODAL */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
-          <Card pad="p-6" className="w-full max-w-md" tag>
-            <h2 className="text-lg font-bold mb-4" style={{ color: C.gold, fontFamily: FONT.head }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.8)" }}>
+          <Card pad="p-5 sm:p-6" className="w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto" tag>
+            <h2 className="text-base sm:text-lg font-bold mb-4" style={{ color: C.gold, fontFamily: FONT.head }}>
               {editingId ? "Edit Team" : "Assign New Team"}
             </h2>
             
             <div className="space-y-4">
               <div>
-                <label className="block text-xs uppercase font-bold mb-1" style={{ color: C.textFaint, fontFamily: FONT.head }}>Team/Project Name</label>
+                <label className="block text-xs uppercase font-bold mb-1" style={{ color: C.textFaint, fontFamily: FONT.head }}>Team / Project Name</label>
                 <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full border px-3 py-2 text-sm outline-none" style={inputStyle} placeholder="e.g. Firmware Division" />
               </div>
 
@@ -144,7 +143,7 @@ export function Team({ liveTeams = [], allUsers = [], profile, userId }) {
                         onChange={() => toggleMember(u.id)}
                         className="accent-yellow-600"
                       />
-                      <span className="text-sm" style={{ color: C.text, fontFamily: FONT.body }}>{u.name}</span>
+                      <span className="text-xs sm:text-sm truncate" style={{ color: C.text, fontFamily: FONT.body }}>{u.name}</span>
                       <span className="ml-auto text-[10px]" style={{ color: C.textFaint, fontFamily: FONT.mono }}>{u.role}</span>
                     </label>
                   ))}

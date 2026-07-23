@@ -3,7 +3,7 @@ import { AlertCircle, Rocket } from "lucide-react";
 import { doc, updateDoc, collection, addDoc, increment } from "firebase/firestore";
 import { db } from "../../firebase";
 import { C, FONT, clipCorner } from "../../theme";
-import { SectionHeader, Badge, Card, Avatar, PrimaryBtn } from "../Primitives";
+import { SectionHeader, Badge, Card, PrimaryBtn } from "../Primitives";
 
 export function Projects({ liveTasks = { todo: [], progress: [], done: [], completed: [] }, liveTeams = [], userRole, userId, profile, allMembers = [] }) {
   const [dragId, setDragId] = useState(null);
@@ -30,7 +30,6 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
   const canDrag = !["Presenter", "Media", "Operations"].includes(userRole);
   const isCoreAdmin = ["Owner", "Head Developer"].includes(userRole);
 
-  // Visibility Logic: Admin, Assigner, or part of the assigned team
   const myTeamIds = liveTeams.filter(t => t.leadId === userId || (t.memberIds || []).includes(userId)).map(t => t.id);
   const canViewTask = (task) => {
     if (isCoreAdmin) return true;
@@ -41,7 +40,7 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
   const onDrop = async (colKey) => {
     setDragOverCol(null);
     if (dragId == null || dragFrom == null || dragFrom === colKey) return;
-    if (colKey === "completed") return; // completion only happens via owner sign-off
+    if (colKey === "completed") return;
     if (!canDrag) return;
 
     await updateDoc(doc(db, "tasks", dragId), { status: colKey });
@@ -85,7 +84,6 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
       feedback: feedbackText
     });
 
-    // Distribute points to all team members and lead
     const targetTeam = liveTeams.find(t => t.id === teamId);
     if (targetTeam) {
       const uids = [...new Set([targetTeam.leadId, ...(targetTeam.memberIds || [])])];
@@ -120,12 +118,12 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
               Initialize operation task
             </span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <input
               value={draft}
               onChange={e => setDraft(e.target.value)}
               placeholder="Task Description / Title..."
-              className="col-span-1 md:col-span-4 border px-3 py-2 text-xs outline-none"
+              className="col-span-1 sm:col-span-2 lg:col-span-4 border px-3 py-2 text-xs outline-none"
               style={inputStyle}
             />
             <input
@@ -145,7 +143,7 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
             <select
               value={selectedTeam}
               onChange={e => setSelectedTeam(e.target.value)}
-              className="border px-2 py-2 text-xs outline-none col-span-1 md:col-span-2"
+              className="border px-2 py-2 text-xs outline-none sm:col-span-2 lg:col-span-2"
               style={inputStyle}
             >
               <option value="" disabled style={{ background: C.bgCard, color: C.textFaint }}>Select Team Assignee...</option>
@@ -172,7 +170,7 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
       </div>
 
       {/* KANBAN BOARD */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="flex overflow-x-auto pb-4 gap-4 md:grid md:grid-cols-2 xl:grid-cols-4">
         {cols.map(col => {
           const items = (liveTasks[col.key] || [])
             .filter(canViewTask)
@@ -183,6 +181,7 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
           return (
             <div
               key={col.key}
+              className="min-w-[260px] md:min-w-0 flex-1"
               onDragOver={e => { e.preventDefault(); if (col.key !== "completed") setDragOverCol(col.key); }}
               onDragLeave={() => setDragOverCol(prev => (prev === col.key ? null : prev))}
               onDrop={() => onDrop(col.key)}
@@ -224,7 +223,6 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
                       ...clipCorner(8, ["tr"]),
                     }}
                   >
-                    {/* META DATA TAGS */}
                     <div className="flex flex-wrap items-center gap-2 mb-3 pb-2 border-b" style={{ borderColor: C.border }}>
                       <span className="text-[10px] uppercase font-bold tracking-wider" style={{ color: C.gold, fontFamily: FONT.head }}>{t.category || "General"}</span>
                       <span className="text-[9px] px-1.5 py-0.5 rounded border" style={{ borderColor: C.border, color: C.textFaint, fontFamily: FONT.mono }}>{t.taskType || "Task"}</span>
@@ -232,7 +230,6 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
 
                     <div className="text-xs leading-relaxed font-semibold mb-3" style={{ color: C.text, fontFamily: FONT.body }}>{t.title}</div>
                     
-                    {/* ASSIGNMENT INFO */}
                     <div className="flex flex-col gap-1 text-[10px]" style={{ color: C.textFaint, fontFamily: FONT.mono }}>
                       <div>Assigned By: <span style={{ color: C.textDim }}>{t.assignedByName}</span></div>
                       <div>Assigned To: <span style={{ color: C.textDim }}>{t.teamName}</span></div>
