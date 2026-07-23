@@ -170,7 +170,7 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
       </div>
 
       {/* KANBAN BOARD */}
-      <div className="flex overflow-x-auto pb-4 gap-4 md:grid md:grid-cols-2 xl:grid-cols-4">
+      <div className="flex overflow-x-auto pb-4 gap-6 md:grid md:grid-cols-2">
         {cols.map(col => {
           const items = (liveTasks[col.key] || [])
             .filter(canViewTask)

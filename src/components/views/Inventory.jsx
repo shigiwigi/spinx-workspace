@@ -7,8 +7,6 @@ import { Card, SectionHeader, Badge, PrimaryBtn, GhostBtn } from "../Primitives"
 
 const inputStyle = { borderColor: C.border, background: "transparent", color: C.text, fontFamily: FONT.body };
 
-// Note: Pass `userRole={profile.role}` from App.jsx if you want strict owner editing, 
-// otherwise this checks if role is passed, defaulting to true for safety if missing.
 export function Inventory({ liveInventory = [], liveDocs = [], userRole = "Owner" }) {
   const [tab, setTab] = useState("components");
 
@@ -50,10 +48,26 @@ function ComponentsTab({ liveInventory, userRole }) {
   const [expandedLoc, setExpandedLoc] = useState(null);
 
   const isOwner = userRole === "Owner" || userRole === "Head Developer";
-
-  // Reverses the list so it displays in natural seeded order instead of inverted
-  const sortedInventory = [...liveInventory].reverse();
   const matchesSearch = (str) => str?.toLowerCase().includes(q.toLowerCase());
+
+  // 1. Reverse the list for natural order
+  const sortedInventory = [...liveInventory].reverse();
+
+  // 2. Filter out locations that have NO matches when searching
+  const filteredInventory = sortedInventory.filter(loc => {
+    if (!q) return true; // Show all if no search query
+    
+    // Check if any item in any section or subbox matches the search
+    return (loc.sections || []).some(sec => {
+      const hasDirectMatch = (sec.items || []).some(i => matchesSearch(i.name));
+      if (hasDirectMatch) return true;
+      
+      const hasBoxMatch = (sec.subBoxes || []).some(box => 
+        (box.items || []).some(i => matchesSearch(i.name))
+      );
+      return hasBoxMatch;
+    });
+  });
 
   // --- CORE FIRESTORE UPDATERS ---
   const updateFirestore = async (locId, newSections) => {
@@ -150,14 +164,16 @@ function ComponentsTab({ liveInventory, userRole }) {
         )}
       </div>
 
-      {sortedInventory.length === 0 ? (
+      {filteredInventory.length === 0 ? (
         <Card className="text-center py-16 text-sm">
           <Boxes size={30} className="mx-auto mb-2 opacity-40" style={{ color: C.gold }} />
-          <div style={{ color: C.textDim, fontFamily: FONT.body }}>No items found in system inventory.</div>
+          <div style={{ color: C.textDim, fontFamily: FONT.body }}>
+            {q ? "No components found matching your search." : "No items found in system inventory."}
+          </div>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sortedInventory.map(loc => {
+          {filteredInventory.map(loc => {
             const isExpanded = expandedLoc === loc.id || q; // Auto-expand if searching
             
             return (
