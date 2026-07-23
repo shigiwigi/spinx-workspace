@@ -1,15 +1,20 @@
-// Navigation links
+import { 
+  LayoutDashboard, 
+  Kanban, 
+  Boxes, 
+  Calendar, 
+  Users, 
+  Bell 
+} from "lucide-react";
+
+// Navigation links (Removed Procurement, AI Features, Analytics, Finance per your setup)
 export const NAV = [
-  { id: "dashboard", label: "Dashboard" },
-  { id: "projects", label: "Projects" },
-  { id: "inventory", label: "Inventory" },
-  { id: "procurement", label: "Procurement" },
-  { id: "meetings", label: "Meetings" },
-  { id: "finance", label: "Finance" },
-  { id: "team", label: "Team" },
-  { id: "ai", label: "AI Features" },
-  { id: "analytics", label: "Analytics" },
-  { id: "notices", label: "Notices" }
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "projects", label: "Projects", icon: Kanban },
+  { id: "inventory", label: "Inventory", icon: Boxes },
+  { id: "meetings", label: "Meetings", icon: Calendar },
+  { id: "team", label: "Team", icon: Users },
+  { id: "notices", label: "Notices", icon: Bell }
 ];
 
 // Teams data
@@ -30,7 +35,7 @@ export const teamMembers = [];
 export const docGroups = [];
 export const initialProcurement = [];
 
-// Detailed Hierarchical Inventory Dataset
+// Detailed Hierarchical Inventory Dataset for Seeding
 export const inventoryData = [
   {
     location: "Closet",

@@ -10,7 +10,6 @@ import { NAV } from "./data";
 import { Dashboard } from "./components/views/Dashboard";
 import { Meetings } from "./components/views/Meetings";
 import { Notices } from "./components/views/Notices";
-import { Finance } from "./components/views/Finance";
 import { Inventory } from "./components/views/Inventory";
 import { Projects } from "./components/views/Projects";
 import { Team } from "./components/views/Team";
@@ -29,7 +28,6 @@ export default function SpinXWorkspace() {
 
   const [meetings, setMeetings] = useState([]);
   const [notices, setNotices] = useState([]);
-  const [expenses, setExpenses] = useState([]);
   const [inventory, setInventory] = useState([]);
   const [tasks, setTasks] = useState({ todo: [], progress: [], done: [], completed: [] });
   const [team, setTeam] = useState([]);
@@ -84,14 +82,13 @@ export default function SpinXWorkspace() {
 
     const unsubMeetings = onSnapshot(query(collection(db, "meetings"), orderBy("createdAt", "desc")), (s) => setMeetings(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubNotices = onSnapshot(query(collection(db, "notices"), orderBy("createdAt", "desc")), (s) => setNotices(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubExpenses = onSnapshot(query(collection(db, "expenses"), orderBy("createdAt", "desc")), (s) => setExpenses(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubInventory = onSnapshot(query(collection(db, "inventory"), orderBy("createdAt", "desc")), (s) => setInventory(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubTeam = onSnapshot(query(collection(db, "team"), orderBy("createdAt", "asc")), (s) => setTeam(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubDocs = onSnapshot(query(collection(db, "documentation"), orderBy("createdAt", "asc")), (s) => setDocs(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubCalendar = onSnapshot(query(collection(db, "calendarEvents"), orderBy("date", "asc")), (s) => setCalendarEvents(s.docs.map(d => ({ id: d.id, ...d.data() }))));
 
     return () => {
-      unsubUsers(); unsubMeetings(); unsubNotices(); unsubExpenses();
+      unsubUsers(); unsubMeetings(); unsubNotices();
       unsubInventory(); unsubTasks(); unsubTeam(); unsubDocs(); unsubCalendar();
     };
   }, [user]);
@@ -113,8 +110,7 @@ export default function SpinXWorkspace() {
 
   const allowedNav = (NAV || []).filter(n => {
     if (profile.role === "Owner" || profile.role === "Head Developer") return true;
-    if (profile.role === "Developer") return !["finance"].includes(n.id);
-    if (profile.role === "Operations") return !["finance"].includes(n.id);
+    if (profile.role === "Developer" || profile.role === "Operations") return true;
     if (profile.role === "Media") return ["dashboard", "notices", "team", "calendar"].includes(n.id);
     if (profile.role === "Presenter") return ["dashboard", "meetings", "notices", "calendar"].includes(n.id);
     return false;
@@ -122,15 +118,14 @@ export default function SpinXWorkspace() {
 
   const renderSection = () => {
     switch (active) {
-      case "dashboard": return <Dashboard meetings={meetings} inventory={inventory} notices={notices} tasks={tasks} expenses={expenses} profile={profile} userId={user?.uid} team={team} />;
+      case "dashboard": return <Dashboard meetings={meetings} inventory={inventory} notices={notices} tasks={tasks} profile={profile} userId={user?.uid} team={team} />;
       case "meetings": return <Meetings liveMeetings={meetings} />;
       case "notices": return <Notices liveNotices={notices} />;
       case "calendar": return <CalendarView liveEvents={calendarEvents} />;
-      case "finance": return <Finance liveExpenses={expenses} />;
       case "inventory": return <Inventory liveInventory={inventory} liveDocs={docs} />;
       case "projects": return <Projects liveTasks={tasks} userRole={profile.role} userId={user.uid} allMembers={allUsers} />;
       case "team": return <Team liveTeam={team} />;
-      default: return <Dashboard meetings={meetings} inventory={inventory} notices={notices} tasks={tasks} expenses={expenses} profile={profile} userId={user?.uid} team={team} />;
+      default: return <Dashboard meetings={meetings} inventory={inventory} notices={notices} tasks={tasks} profile={profile} userId={user?.uid} team={team} />;
     }
   };
 
