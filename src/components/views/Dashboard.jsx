@@ -4,12 +4,10 @@ import { C, FONT } from "../../theme";
 import { Card, Eyebrow, SectionHeader, Badge, ProgressBar, SprayStreak } from "../Primitives";
 
 export function Dashboard({ meetings = [], inventory = [], notices: _notices = [], tasks = { todo: [], progress: [], done: [], completed: [] }, expenses = [], profile = {}, userId, team = [] }) {
-  // Recursively extract all low-stock items from locations, sections, and subBoxes
   const getLowStockItems = () => {
     const lowItems = [];
     (inventory || []).forEach(loc => {
       (loc.sections || []).forEach(sec => {
-        // Direct items in section
         (sec.items || []).forEach(item => {
           const qty = parseInt(item.quantity || item.qty || "0", 10);
           const lowThreshold = parseInt(item.low || "2", 10);
@@ -17,7 +15,6 @@ export function Dashboard({ meetings = [], inventory = [], notices: _notices = [
             lowItems.push({ id: item.name, name: item.name, qty: item.quantity || item.qty, location: loc.location });
           }
         });
-        // Items in subBoxes
         (sec.subBoxes || []).forEach(box => {
           (box.items || []).forEach(bItem => {
             const qty = parseInt(bItem.quantity || bItem.qty || "0", 10);
@@ -53,17 +50,16 @@ export function Dashboard({ meetings = [], inventory = [], notices: _notices = [
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-1">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-1 gap-3">
         <SectionHeader title="Dashboard" subtitle="Here's where things stand at SpinX." />
-      </div>
-      <div className="flex justify-end -mt-4 mb-4">
-        <div className="flex items-center gap-1.5 px-2.5 py-1" style={{ background: C.successSoft, border: `1px solid rgba(48,164,108,0.28)` }}>
+        <div className="flex items-center self-start sm:self-auto gap-1.5 px-2.5 py-1" style={{ background: C.successSoft, border: `1px solid rgba(48,164,108,0.28)` }}>
           <Radio size={11} style={{ color: C.success }} />
           <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: C.success, fontFamily: FONT.head }}>System link: Online</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+      {/* Responsive 1 -> 2 -> 4 Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
         {stats.map((s, i) => (
           <Card key={i} pad="p-4" tag>
             <div className="flex items-start justify-between">
@@ -83,7 +79,7 @@ export function Dashboard({ meetings = [], inventory = [], notices: _notices = [
           <SprayStreak size={180} opacity={0.035} style={{ bottom: -40, right: -30 }} />
           <div className="relative flex items-center justify-between mb-3">
             <Eyebrow>Budget overview</Eyebrow>
-            <Badge tone="gold">₹{totalSpent.toLocaleString()} logged</Badge>
+            <Badge tone="gold">₹{totalSpent.toLocaleString()} this month</Badge>
           </div>
           {totalSpent === 0 ? (
             <div className="h-[160px] flex flex-col items-center justify-center border border-dashed gap-2" style={{ borderColor: C.border }}>
@@ -104,18 +100,18 @@ export function Dashboard({ meetings = [], inventory = [], notices: _notices = [
         <Card>
           <Eyebrow>Upcoming meetings</Eyebrow>
           <div className="mt-3 space-y-3">
-            {meetings.filter(m => m.status === "Scheduled" || !m.status).length === 0 ? (
+            {meetings.filter(m => m.status === "Scheduled").length === 0 ? (
               <p className="text-xs py-4 text-center" style={{ color: C.textFaint, fontFamily: FONT.body }}>No upcoming meetings scheduled.</p>
             ) : (
-              meetings.filter(m => m.status === "Scheduled" || !m.status).slice(0, 4).map(m => (
+              meetings.filter(m => m.status === "Scheduled").map(m => (
                 <div key={m.id} className="flex items-start gap-2.5 pb-3 border-b" style={{ borderColor: C.border }}>
                   <div className="text-center shrink-0 px-2 py-1" style={{ background: C.surface3, border: `1px solid ${C.border}`, fontFamily: FONT.mono }}>
-                    <div className="text-[10px]" style={{ color: C.textFaint }}>{m.date?.split(" ")[0] || "Upcoming"}</div>
-                    <div className="text-sm font-medium" style={{ color: C.gold }}>{m.date?.split(" ")[1] || "—"}</div>
+                    <div className="text-[10px]" style={{ color: C.textFaint }}>{m.date?.split(" ")[0]}</div>
+                    <div className="text-sm font-medium" style={{ color: C.gold }}>{m.date?.split(" ")[1]}</div>
                   </div>
-                  <div>
-                    <div className="text-sm" style={{ color: C.text, fontFamily: FONT.body }}>{m.title}</div>
-                    <div className="text-[11px] mt-0.5" style={{ color: C.textFaint, fontFamily: FONT.mono }}>{m.time || "TBD"}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm truncate" style={{ color: C.text, fontFamily: FONT.body }}>{m.title}</div>
+                    <div className="text-[11px] mt-0.5 truncate" style={{ color: C.textFaint, fontFamily: FONT.mono }}>{m.time}</div>
                   </div>
                 </div>
               ))
@@ -138,17 +134,17 @@ export function Dashboard({ meetings = [], inventory = [], notices: _notices = [
             <AlertTriangle size={14} style={{ color: C.danger }} />
             <Eyebrow>Inventory alerts</Eyebrow>
           </div>
-          <div className="space-y-2 max-h-[220px] overflow-y-auto">
+          <div className="space-y-2 max-h-[200px] overflow-y-auto">
             {lowStock.length === 0 ? (
               <p className="text-xs py-4 text-center" style={{ color: C.textFaint, fontFamily: FONT.body }}>All items are well stocked.</p>
             ) : (
               lowStock.map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between px-2.5 py-2 text-xs" style={{ background: C.dangerSoft, border: `1px solid rgba(229,72,77,0.25)`, fontFamily: FONT.head }}>
-                  <div className="flex flex-col">
-                    <span style={{ color: C.text }}>{item.name}</span>
-                    <span className="text-[9px]" style={{ color: C.textFaint }}>{item.location}</span>
+                <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2 px-2.5 py-2 text-xs" style={{ background: C.dangerSoft, border: `1px solid rgba(229,72,77,0.25)`, fontFamily: FONT.head }}>
+                  <div className="min-w-0">
+                    <div className="truncate" style={{ color: C.text }}>{item.name}</div>
+                    <div className="text-[9px] truncate" style={{ color: C.textFaint }}>{item.location}</div>
                   </div>
-                  <span style={{ color: C.danger, fontFamily: FONT.mono }}>{item.qty} left</span>
+                  <span className="shrink-0" style={{ color: C.danger, fontFamily: FONT.mono }}>{item.qty} left</span>
                 </div>
               ))
             )}
@@ -156,11 +152,11 @@ export function Dashboard({ meetings = [], inventory = [], notices: _notices = [
         </Card>
       </div>
 
-      {/* PERSONAL ANALYTICS — everyone except Owner */}
       {!isOwner && (
         <Card className="relative overflow-hidden" tag>
           <SprayStreak size={160} opacity={0.03} style={{ top: -30, right: -20 }} />
           <Eyebrow>Your performance</Eyebrow>
+          {/* Responsive 2 -> 4 Grid */}
           <div className="relative grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
             <div className="border-t pt-3" style={{ borderColor: C.border }}>
               <CalendarCheck2 size={14} style={{ color: C.gold }} className="mb-2" />

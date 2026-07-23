@@ -18,7 +18,7 @@ export function Finance({ liveExpenses = [] }) {
       desc: form.desc,
       cat: form.cat,
       amt: Number(form.amt),
-      date: "Jul 14",
+      date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       createdAt: new Date()
     });
     setForm({ desc: "", cat: "Components", amt: "" });
@@ -30,10 +30,14 @@ export function Finance({ liveExpenses = [] }) {
 
   return (
     <div>
-      <SectionHeader title="Finance" subtitle="Expenses and budget logs."
-        action={<PrimaryBtn icon={Plus} onClick={() => setShowForm(!showForm)}>Add expense</PrimaryBtn>} />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <SectionHeader title="Finance" subtitle="Expenses and budget logs." />
+        <PrimaryBtn icon={Plus} onClick={() => setShowForm(!showForm)} small className="self-start sm:self-auto whitespace-nowrap">
+          Add expense
+        </PrimaryBtn>
+      </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
         <Card pad="p-4" tag>
           <Eyebrow>Total spent</Eyebrow>
           <div className="text-2xl mt-1.5" style={{ fontFamily: FONT.mono, color: C.text }}>₹{totalSpent.toLocaleString()}</div>
@@ -54,17 +58,19 @@ export function Finance({ liveExpenses = [] }) {
 
       {showForm && (
         <Card className="mb-4" tag>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <input placeholder="Description" value={form.desc} onChange={e => setForm({ ...form, desc: e.target.value })}
-              className="col-span-2 border px-3 py-2 text-sm outline-none" style={inputStyle} />
+              className="col-span-1 sm:col-span-2 lg:col-span-2 border px-3 py-2 text-sm outline-none" style={inputStyle} />
             <select value={form.cat} onChange={e => setForm({ ...form, cat: e.target.value })}
               className="border px-3 py-2 text-xs outline-none" style={{ ...inputStyle, fontFamily: FONT.head }}>
               {expenseCategories.map(c => <option key={c} value={c} style={{ background: C.surface }}>{c}</option>)}
             </select>
-            <input placeholder="Amount ₹" value={form.amt} onChange={e => setForm({ ...form, amt: e.target.value })}
+            <input placeholder="Amount ₹" type="number" value={form.amt} onChange={e => setForm({ ...form, amt: e.target.value })}
               className="border px-3 py-2 text-sm outline-none" style={{ ...inputStyle, fontFamily: FONT.mono }} />
           </div>
-          <div className="mt-3"><PrimaryBtn onClick={addExpense} icon={Check} small>Save expense</PrimaryBtn></div>
+          <div className="mt-3 flex justify-end">
+            <PrimaryBtn onClick={addExpense} icon={Check} small>Save expense</PrimaryBtn>
+          </div>
         </Card>
       )}
 
@@ -74,8 +80,8 @@ export function Finance({ liveExpenses = [] }) {
           <div style={{ color: C.textDim, fontFamily: FONT.body }}>No expenses logged yet.</div>
         </Card>
       ) : (
-        <Card pad="p-0">
-          <table className="w-full text-sm">
+        <Card pad="p-0" className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[500px]">
             <thead>
               <tr style={{ borderBottom: `1px solid ${C.border}` }}>
                 {["Description", "Category", "Date", "Amount"].map(h => (
@@ -88,8 +94,8 @@ export function Finance({ liveExpenses = [] }) {
                 <tr key={e.id} style={{ borderBottom: `1px solid ${C.border}` }}>
                   <td className="px-4 py-3" style={{ color: C.text, fontFamily: FONT.body }}>{e.desc}</td>
                   <td className="px-4 py-3"><Badge>{e.cat}</Badge></td>
-                  <td className="px-4 py-3" style={{ color: C.textFaint, fontFamily: FONT.mono, fontSize: 12 }}>{e.date}</td>
-                  <td className="px-4 py-3" style={{ color: C.text, fontFamily: FONT.mono }}>₹{e.amt.toLocaleString()}</td>
+                  <td className="px-4 py-3 whitespace-nowrap" style={{ color: C.textFaint, fontFamily: FONT.mono, fontSize: 12 }}>{e.date}</td>
+                  <td className="px-4 py-3 font-semibold" style={{ color: C.text, fontFamily: FONT.mono }}>₹{e.amt.toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>

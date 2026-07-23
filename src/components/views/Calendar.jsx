@@ -73,25 +73,26 @@ export function CalendarView({ liveEvents = [] }) {
     <div>
       <SectionHeader title="Calendar" subtitle="Team schedule, reminders and monthly planning." />
 
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="col-span-2" pad="p-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* MAIN CALENDAR GRID */}
+        <Card className="lg:col-span-2" pad="p-3 sm:p-4">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-semibold" style={{ color: C.text, fontFamily: FONT.head, fontSize: 16 }}>
+            <span className="text-sm sm:text-base font-semibold" style={{ color: C.text, fontFamily: FONT.head }}>
               {MONTHS[m]} {y}
             </span>
             <div className="flex items-center gap-1.5">
-              <button onClick={() => shiftMonth(-1)} className="p-1.5 border" style={{ borderColor: C.border }}><ChevronLeft size={14} style={{ color: C.textDim }} /></button>
-              <button onClick={() => shiftMonth(1)} className="p-1.5 border" style={{ borderColor: C.border }}><ChevronRight size={14} style={{ color: C.textDim }} /></button>
+              <button onClick={() => shiftMonth(-1)} className="p-1.5 border hover:bg-white/5 transition-colors" style={{ borderColor: C.border }}><ChevronLeft size={14} style={{ color: C.textDim }} /></button>
+              <button onClick={() => shiftMonth(1)} className="p-1.5 border hover:bg-white/5 transition-colors" style={{ borderColor: C.border }}><ChevronRight size={14} style={{ color: C.textDim }} /></button>
             </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-1.5 mb-1.5">
+          <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
             {DOW.map(d => (
-              <div key={d} className="text-center text-[10px] uppercase tracking-wider py-1" style={{ color: C.textFaint, fontFamily: FONT.head }}>{d}</div>
+              <div key={d} className="text-center text-[9px] sm:text-[10px] uppercase tracking-wider py-1 truncate" style={{ color: C.textFaint, fontFamily: FONT.head }}>{d}</div>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1.5">
+          <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
             {cells.map((d, i) => {
               if (d === null) return <div key={i} />;
               const key = toKey(y, m, d);
@@ -102,15 +103,15 @@ export function CalendarView({ liveEvents = [] }) {
                 <button
                   key={i}
                   onClick={() => setSelected(key)}
-                  className="relative flex flex-col items-start p-1.5 text-left"
+                  className="relative flex flex-col items-center sm:items-start p-1 sm:p-1.5 text-center sm:text-left transition-colors"
                   style={{
-                    minHeight: 58,
+                    minHeight: "48px",
                     background: isSelected ? C.goldSoft : C.surface,
                     border: `1px solid ${isSelected ? C.goldLine : C.border}`,
                   }}
                 >
                   <span
-                    className="text-xs"
+                    className="text-[11px] sm:text-xs"
                     style={{
                       color: isToday ? C.gold : C.text,
                       fontFamily: FONT.mono,
@@ -120,7 +121,7 @@ export function CalendarView({ liveEvents = [] }) {
                     {d}
                   </span>
                   {dayEvents.length > 0 && (
-                    <div className="flex flex-wrap gap-0.5 mt-1">
+                    <div className="flex flex-wrap justify-center sm:justify-start gap-0.5 mt-1 sm:mt-1.5">
                       {dayEvents.slice(0, 3).map((_, idx) => (
                         <div key={idx} style={{ width: 4, height: 4, borderRadius: "50%", background: C.gold }} />
                       ))}
@@ -132,6 +133,7 @@ export function CalendarView({ liveEvents = [] }) {
           </div>
         </Card>
 
+        {/* DETAILS & FORM PANEL */}
         <Card pad="p-4">
           <div className="flex items-center gap-2 mb-1">
             <CalendarDays size={13} style={{ color: C.gold }} />
@@ -140,7 +142,7 @@ export function CalendarView({ liveEvents = [] }) {
             </span>
           </div>
 
-          <div className="space-y-2 my-3">
+          <div className="space-y-2 my-3 max-h-[250px] overflow-y-auto pr-1">
             {selectedEvents.length === 0 ? (
               <p className="text-xs py-3 text-center" style={{ color: C.textFaint, fontFamily: FONT.body }}>No reminders on this day.</p>
             ) : (
