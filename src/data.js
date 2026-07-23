@@ -1,3 +1,36 @@
+// Navigation links
+export const NAV = [
+  { id: "dashboard", label: "Dashboard" },
+  { id: "projects", label: "Projects" },
+  { id: "inventory", label: "Inventory" },
+  { id: "procurement", label: "Procurement" },
+  { id: "meetings", label: "Meetings" },
+  { id: "finance", label: "Finance" },
+  { id: "team", label: "Team" },
+  { id: "ai", label: "AI Features" },
+  { id: "analytics", label: "Analytics" },
+  { id: "notices", label: "Notices" }
+];
+
+// Teams data
+export const TEAMS = [
+  "Core Hardware",
+  "Firmware & Flight Control",
+  "Software & Ground Station",
+  "Payload & Integration",
+  "Operations & Logistics"
+];
+
+// Initial mock state exports used by seed script
+export const initialMeetings = [];
+export const initialNotices = [];
+export const initialExpenses = [];
+export const initialTasks = [];
+export const teamMembers = [];
+export const docGroups = [];
+export const initialProcurement = [];
+
+// Detailed Hierarchical Inventory Dataset
 export const inventoryData = [
   {
     location: "Closet",
