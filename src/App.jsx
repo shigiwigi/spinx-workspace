@@ -37,7 +37,7 @@ export default function SpinXWorkspace() {
   const [docs, setDocs] = useState([]);
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [expenses, setExpenses] = useState([]);
-  const [rolesList, setRolesList] = useState([]); // Dynamic Roles State
+  const [rolesList, setRolesList] = useState([]);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
@@ -68,7 +68,6 @@ export default function SpinXWorkspace() {
     return () => unsubscribeAuth();
   }, []);
 
-  // Central Real-time Listener Hub
   useEffect(() => {
     if (!user) return;
 
@@ -136,9 +135,9 @@ export default function SpinXWorkspace() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center w-screen h-screen gap-3" style={{ background: C.bg }}>
-        <LogoMark size={44} />
-        <div className="text-xs tracking-[0.3em]" style={{ color: C.textFaint, fontFamily: FONT.head, animation: "spinxPulse 1.4s ease-in-out infinite" }}>
+      <div className="flex flex-col items-center justify-center w-screen h-screen gap-6" style={{ background: C.bg }}>
+        <LogoMark size={120} />
+        <div className="text-sm tracking-[0.4em]" style={{ color: C.textFaint, fontFamily: FONT.head, animation: "spinxPulse 1.4s ease-in-out infinite" }}>
           LOADING SYSTEM
         </div>
       </div>
@@ -188,7 +187,14 @@ export default function SpinXWorkspace() {
         }}
       >
         <div className="flex items-center justify-between px-4 h-16 shrink-0 border-b" style={{ borderColor: C.border }}>
-          <LogoMark size={collapsed ? 32 : 46} />
+          <div className="flex items-center gap-2">
+            <LogoMark size={collapsed ? 32 : 36} />
+            {(!collapsed || mobileOpen) && (
+              <span className="text-xs tracking-[0.2em] font-bold mt-0.5" style={{ color: C.textDim, fontFamily: FONT.display }}>
+                WORKSPACE
+              </span>
+            )}
+          </div>
           <button className="md:hidden" onClick={() => setMobileOpen(false)}>
             <X size={20} style={{ color: C.textFaint }} />
           </button>
@@ -308,11 +314,9 @@ export default function SpinXWorkspace() {
                                 style={{ background: C.bg, borderColor: C.border, color: C.text, fontFamily: FONT.body }}
                               >
                                 <option value="Owner">Owner</option>
-                                {/* Maps custom roles pulled dynamically from Firestore */}
                                 {rolesList.map(r => (
                                   <option key={r.id} value={r.name}>{r.name}</option>
                                 ))}
-                                {/* Failsafe for unmapped roles */}
                                 {!rolesList.find(r => r.name === u.role) && u.role !== "Owner" && (
                                   <option value={u.role}>{u.role}</option>
                                 )}
