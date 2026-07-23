@@ -123,8 +123,8 @@ export default function SpinXWorkspace() {
       case "notices": return <Notices liveNotices={notices} />;
       case "calendar": return <CalendarView liveEvents={calendarEvents} />;
       case "inventory": return <Inventory liveInventory={inventory} liveDocs={docs} />;
-      // UPDATED PROPS FOR PROJECTS AND TEAM
-      case "projects": return <Projects liveTasks={tasks} liveTeams={team} profile={profile} userId={user?.uid} allMembers={allUsers} />;
+      // THESE WERE THE PROPS I ACCIDENTALLY DELETED LAST TIME:
+      case "projects": return <Projects liveTasks={tasks} liveTeams={team} userRole={profile.role} userId={user?.uid} profile={profile} allMembers={allUsers} />;
       case "team": return <Team liveTeams={team} allUsers={allUsers} profile={profile} userId={user?.uid} />;
       default: return <Dashboard meetings={meetings} inventory={inventory} notices={notices} tasks={tasks} profile={profile} userId={user?.uid} team={team} />;
     }
@@ -239,11 +239,10 @@ export default function SpinXWorkspace() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6" style={{ background: C.bg }}>
-          {/* UPDATED TEAM RENDER WITH ACCESS CONTROLS IN THE COMPONENT ITSELF */}
           {active === "team" ? (
             <div>
               <Team liveTeams={team} allUsers={allUsers} profile={profile} userId={user?.uid} />
-              
+
               {["Owner", "Head Developer"].includes(profile.role) && (
                 <div className="mt-8">
                   <div className="flex items-center gap-2 mb-3">
