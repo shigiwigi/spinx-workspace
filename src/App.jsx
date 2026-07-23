@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { LogOut, Award, ShieldCheck, Sparkles, X } from "lucide-react";
+import { LogOut, Award, ShieldCheck, Sparkles, X, LayoutDashboard } from "lucide-react";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 import { db, auth, googleProvider } from "./firebase";
@@ -111,7 +111,7 @@ export default function SpinXWorkspace() {
   const handleLogin = async () => { try { await signInWithPopup(auth, googleProvider); } catch (e) { console.error(e); } };
   const handleLogout = async () => { try { await signOut(auth); setActive("dashboard"); } catch (e) { console.error(e); } };
 
-  const allowedNav = NAV.filter(n => {
+  const allowedNav = (NAV || []).filter(n => {
     if (profile.role === "Owner" || profile.role === "Head Developer") return true;
     if (profile.role === "Developer") return !["finance"].includes(n.id);
     if (profile.role === "Operations") return !["finance"].includes(n.id);
@@ -152,7 +152,6 @@ export default function SpinXWorkspace() {
         <SprayStreak size={340} opacity={0.04} style={{ bottom: -100, left: -100, transform: "rotate(180deg)" }} />
         <div className="relative max-w-sm w-full p-8 text-center" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
           <div className="flex justify-center mb-5">
-            {/* Replace LogoMark with the actual SpinX logo image once available in /src/assets */}
             <LogoMark size={56} />
           </div>
           <div className="text-2xl tracking-[0.25em] mb-1" style={{ fontFamily: FONT.display, color: C.text, fontWeight: 800 }}>
@@ -178,6 +177,7 @@ export default function SpinXWorkspace() {
         <div className="flex-1 py-3 px-2.5 space-y-0.5 overflow-y-auto">
           {allowedNav.map(n => {
             const isActive = active === n.id;
+            const IconComponent = n.icon || LayoutDashboard;
             return (
               <button
                 key={n.id}
@@ -191,7 +191,7 @@ export default function SpinXWorkspace() {
                 onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.color = C.text; }}
                 onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.color = C.textDim; }}
               >
-                <n.icon size={16} />
+                <IconComponent size={16} />
                 {!collapsed && <span className="text-sm font-medium" style={{ fontFamily: FONT.head }}>{n.label}</span>}
               </button>
             );
