@@ -109,7 +109,7 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
     <div>
       <SectionHeader title="Projects & Operations" subtitle="Track tasks, assign categories, and manage owner payouts." />
 
-      {/* TASK CREATION — restricted to builders */}
+      {/* TASK CREATION */}
       {canManageBoard && (
         <Card className="mb-6" tag>
           <div className="flex items-center gap-2 mb-3">
@@ -169,8 +169,9 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
         })}
       </div>
 
-      {/* KANBAN BOARD */}
-      <div className="flex overflow-x-auto pb-4 gap-6 md:grid md:grid-cols-2">
+      {/* FIXED KANBAN BOARD GRID */}
+      {/* 1 Col (Phone) -> 2 Cols (Tablet) -> 4 Cols (Desktop) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 pb-4">
         {cols.map(col => {
           const items = (liveTasks[col.key] || [])
             .filter(canViewTask)
@@ -181,7 +182,7 @@ export function Projects({ liveTasks = { todo: [], progress: [], done: [], compl
           return (
             <div
               key={col.key}
-              className="min-w-[260px] md:min-w-0 flex-1"
+              className="flex-1"
               onDragOver={e => { e.preventDefault(); if (col.key !== "completed") setDragOverCol(col.key); }}
               onDragLeave={() => setDragOverCol(prev => (prev === col.key ? null : prev))}
               onDrop={() => onDrop(col.key)}

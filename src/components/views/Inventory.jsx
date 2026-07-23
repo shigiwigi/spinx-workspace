@@ -50,14 +50,11 @@ function ComponentsTab({ liveInventory, userRole }) {
   const isOwner = userRole === "Owner" || userRole === "Head Developer";
   const matchesSearch = (str) => str?.toLowerCase().includes(q.toLowerCase());
 
-  // 1. Reverse the list for natural order
   const sortedInventory = [...liveInventory].reverse();
 
-  // 2. Filter out locations that have NO matches when searching
   const filteredInventory = sortedInventory.filter(loc => {
-    if (!q) return true; // Show all if no search query
+    if (!q) return true; 
     
-    // Check if any item in any section or subbox matches the search
     return (loc.sections || []).some(sec => {
       const hasDirectMatch = (sec.items || []).some(i => matchesSearch(i.name));
       if (hasDirectMatch) return true;
@@ -69,12 +66,10 @@ function ComponentsTab({ liveInventory, userRole }) {
     });
   });
 
-  // --- CORE FIRESTORE UPDATERS ---
   const updateFirestore = async (locId, newSections) => {
     await updateDoc(doc(db, "inventory", locId), { sections: newSections });
   };
 
-  // --- ADDING NEW CATEGORIES / LOCATIONS ---
   const handleAddLocation = async () => {
     const locName = prompt("Enter new location name (e.g. Table 7, Storage Box A):");
     if (!locName?.trim()) return;
@@ -102,7 +97,6 @@ function ComponentsTab({ liveInventory, userRole }) {
     updateFirestore(loc.id, newSections);
   };
 
-  // --- ITEM MANAGEMENT ---
   const handleAddItem = (loc, secIdx, boxIdx = -1) => {
     const name = prompt("Item Name:");
     if (!name?.trim()) return;
@@ -174,7 +168,7 @@ function ComponentsTab({ liveInventory, userRole }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredInventory.map(loc => {
-            const isExpanded = expandedLoc === loc.id || q; // Auto-expand if searching
+            const isExpanded = expandedLoc === loc.id || q; 
             
             return (
               <Card 
@@ -195,11 +189,25 @@ function ComponentsTab({ liveInventory, userRole }) {
                       {loc.location}
                     </h2>
                   </div>
-                  <div className="flex items-center gap-3">
+                  
+                  {/* BUTTONS MOVED NEXT TO TRASH */}
+                  <div className="flex items-center gap-2 sm:gap-3">
                     {isExpanded && isOwner && (
-                      <button onClick={(e) => { e.stopPropagation(); handleDeleteLocation(loc.id); }}>
-                        <Trash2 size={14} style={{ color: C.danger }} />
-                      </button>
+                      <>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleAddSection(loc); }} 
+                          className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded border hover:bg-white/5 transition-colors whitespace-nowrap" 
+                          style={{ borderColor: C.border, color: C.textFaint }}
+                        >
+                          <Plus size={10} /> Section
+                        </button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleDeleteLocation(loc.id); }}
+                          className="p-1 hover:bg-red-500/20 rounded transition-colors"
+                        >
+                          <Trash2 size={14} style={{ color: C.danger }} />
+                        </button>
+                      </>
                     )}
                     {isExpanded ? <ChevronUp size={16} style={{ color: C.textFaint }} /> : <ChevronDown size={16} style={{ color: C.textFaint }} />}
                   </div>
@@ -208,18 +216,19 @@ function ComponentsTab({ liveInventory, userRole }) {
                 {/* EXPANDED CONTENT */}
                 {isExpanded && (
                   <div className="mt-5 space-y-6 pt-4 border-t" style={{ borderColor: C.border }}>
-                    {isOwner && (
-                      <div className="flex justify-end">
-                        <GhostBtn icon={Plus} onClick={() => handleAddSection(loc)} small>Add Section</GhostBtn>
-                      </div>
-                    )}
-
                     {(loc.sections || []).map((sec, secIdx) => {
                       const filteredDirect = (sec.items || []).filter(i => !q || matchesSearch(i.name));
-                      const hasDirectItems = filteredDirect.length > 0;
-                      const hasSubBoxes = sec.subBoxes && sec.subBoxes.length > 0;
+                      
+                      // Filter subBoxes to only include those that have matching items when searching
+                      const filteredSubBoxes = (sec.subBoxes || []).map(box => {
+                        const bItems = (box.items || []).filter(i => !q || matchesSearch(i.name));
+                        return { ...box, items: bItems };
+                      }).filter(box => !q || box.items.length > 0);
 
-                      // Hide section if searching and no matches found inside it
+                      const hasDirectItems = filteredDirect.length > 0;
+                      const hasSubBoxes = filteredSubBoxes.length > 0;
+
+                      // EMPTY SHELF SEARCH FIX: Hide section if searching and no matches found inside it
                       if (q && !hasDirectItems && !hasSubBoxes) return null; 
 
                       return (
@@ -261,10 +270,7 @@ function ComponentsTab({ liveInventory, userRole }) {
                           {/* SUB BOXES / CONTAINERS */}
                           {hasSubBoxes && (
                             <div className="space-y-4">
-                              {sec.subBoxes.map((box, boxIdx) => {
-                                const filteredBoxItems = (box.items || []).filter(i => !q || matchesSearch(i.name));
-                                if (q && filteredBoxItems.length === 0) return null;
-
+                              {filteredSubBoxes.map((box, boxIdx) => {
                                 return (
                                   <div key={boxIdx} className="pl-3 border-l-2" style={{ borderColor: C.goldLine }}>
                                     <div className="flex items-center justify-between mb-2">
@@ -280,7 +286,7 @@ function ComponentsTab({ liveInventory, userRole }) {
                                     </div>
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                                      {filteredBoxItems.map((bItem, bItemIdx) => (
+                                      {box.items.map((bItem, bItemIdx) => (
                                         <div key={bItemIdx} className="flex justify-between items-center p-1.5 border rounded" style={{ borderColor: C.border, background: "rgba(0,0,0,0.3)" }}>
                                           <span className="text-[11px] truncate pr-2" style={{ color: C.textDim, fontFamily: FONT.body }}>{bItem.name}</span>
                                           <div className="flex items-center gap-2 shrink-0">
