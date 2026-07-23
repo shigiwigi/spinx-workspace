@@ -97,34 +97,49 @@ function ComponentsTab({ liveInventory, userRole }) {
     updateFirestore(loc.id, newSections);
   };
 
+  // UPDATED: Now prompts for Current Qty and Required Capacity
   const handleAddItem = (loc, secIdx, boxIdx = -1) => {
     const name = prompt("Item Name:");
     if (!name?.trim()) return;
-    const qty = prompt("Quantity (e.g. 1, 10, Assorted):", "1");
+    
+    const qty = prompt("Current Quantity (e.g. 1, 10):", "1");
     if (qty === null) return;
 
+    const reqQty = prompt("Required/Full Capacity (Leave same as current if no alert needed):", qty);
+    if (reqQty === null) return;
+
     const newSections = [...(loc.sections || [])];
+    const newItem = { name: name.trim(), quantity: qty.trim(), reqQty: reqQty.trim() };
+
     if (boxIdx === -1) {
       if (!newSections[secIdx].items) newSections[secIdx].items = [];
-      newSections[secIdx].items.push({ name: name.trim(), quantity: qty.trim() });
+      newSections[secIdx].items.push(newItem);
     } else {
       if (!newSections[secIdx].subBoxes[boxIdx].items) newSections[secIdx].subBoxes[boxIdx].items = [];
-      newSections[secIdx].subBoxes[boxIdx].items.push({ name: name.trim(), quantity: qty.trim() });
+      newSections[secIdx].subBoxes[boxIdx].items.push(newItem);
     }
     updateFirestore(loc.id, newSections);
   };
 
+  // UPDATED: Now prompts to update both Current and Required quantities
   const handleEditItem = (loc, secIdx, boxIdx, itemIdx, currentItem) => {
     const newName = prompt("Update Name:", currentItem.name);
     if (!newName?.trim()) return;
-    const newQty = prompt("Update Quantity:", currentItem.quantity || currentItem.qty);
+    
+    const currentQ = currentItem.quantity || currentItem.qty || "1";
+    const newQty = prompt("Update Current Quantity:", currentQ);
     if (newQty === null) return;
 
+    const newReqQty = prompt("Update Required Capacity:", currentItem.reqQty || newQty);
+    if (newReqQty === null) return;
+
     const newSections = [...loc.sections];
+    const updatedItem = { name: newName.trim(), quantity: newQty.trim(), reqQty: newReqQty.trim() };
+
     if (boxIdx === -1) {
-      newSections[secIdx].items[itemIdx] = { name: newName.trim(), quantity: newQty.trim() };
+      newSections[secIdx].items[itemIdx] = updatedItem;
     } else {
-      newSections[secIdx].subBoxes[boxIdx].items[itemIdx] = { name: newName.trim(), quantity: newQty.trim() };
+      newSections[secIdx].subBoxes[boxIdx].items[itemIdx] = updatedItem;
     }
     updateFirestore(loc.id, newSections);
   };
@@ -177,7 +192,6 @@ function ComponentsTab({ liveInventory, userRole }) {
                 className={`transition-all duration-300 ${isExpanded ? "col-span-1 md:col-span-2 lg:col-span-3 border-yellow-700/50" : "cursor-pointer hover:border-slate-600"}`}
                 onClick={() => !isExpanded && setExpandedLoc(loc.id)}
               >
-                {/* LOCATION HEADER */}
                 <div 
                   className="flex items-center justify-between" 
                   onClick={() => isExpanded && !q && setExpandedLoc(null)}
@@ -190,7 +204,6 @@ function ComponentsTab({ liveInventory, userRole }) {
                     </h2>
                   </div>
                   
-                  {/* BUTTONS MOVED NEXT TO TRASH */}
                   <div className="flex items-center gap-2 sm:gap-3">
                     {isExpanded && isOwner && (
                       <>
@@ -213,13 +226,11 @@ function ComponentsTab({ liveInventory, userRole }) {
                   </div>
                 </div>
 
-                {/* EXPANDED CONTENT */}
                 {isExpanded && (
                   <div className="mt-5 space-y-6 pt-4 border-t" style={{ borderColor: C.border }}>
                     {(loc.sections || []).map((sec, secIdx) => {
                       const filteredDirect = (sec.items || []).filter(i => !q || matchesSearch(i.name));
                       
-                      // Filter subBoxes to only include those that have matching items when searching
                       const filteredSubBoxes = (sec.subBoxes || []).map(box => {
                         const bItems = (box.items || []).filter(i => !q || matchesSearch(i.name));
                         return { ...box, items: bItems };
@@ -228,13 +239,10 @@ function ComponentsTab({ liveInventory, userRole }) {
                       const hasDirectItems = filteredDirect.length > 0;
                       const hasSubBoxes = filteredSubBoxes.length > 0;
 
-                      // EMPTY SHELF SEARCH FIX: Hide section if searching and no matches found inside it
                       if (q && !hasDirectItems && !hasSubBoxes) return null; 
 
                       return (
                         <div key={secIdx} className="p-3 border rounded-lg bg-black/20" style={{ borderColor: C.border }}>
-                          
-                          {/* SECTION HEADER */}
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                             <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: C.text, fontFamily: FONT.head }}>
                               {sec.name || "General"}
@@ -247,14 +255,16 @@ function ComponentsTab({ liveInventory, userRole }) {
                             )}
                           </div>
 
-                          {/* DIRECT ITEMS */}
                           {hasDirectItems && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
                               {filteredDirect.map((item, itemIdx) => (
                                 <div key={itemIdx} className="flex justify-between items-center p-2 border rounded" style={{ borderColor: C.border, background: C.surface }}>
                                   <span className="text-xs truncate font-medium pr-2" style={{ color: C.text, fontFamily: FONT.body }}>{item.name}</span>
                                   <div className="flex items-center gap-2 shrink-0">
-                                    <Badge>{item.quantity || item.qty}</Badge>
+                                    <Badge>
+                                      {item.quantity || item.qty}
+                                      {item.reqQty && item.reqQty !== (item.quantity || item.qty) ? ` / ${item.reqQty}` : ""}
+                                    </Badge>
                                     {isOwner && (
                                       <>
                                         <button onClick={() => handleEditItem(loc, secIdx, -1, itemIdx, item)}><Pencil size={12} style={{ color: C.textFaint }} className="hover:text-white" /></button>
@@ -267,7 +277,6 @@ function ComponentsTab({ liveInventory, userRole }) {
                             </div>
                           )}
 
-                          {/* SUB BOXES / CONTAINERS */}
                           {hasSubBoxes && (
                             <div className="space-y-4">
                               {filteredSubBoxes.map((box, boxIdx) => {
@@ -290,7 +299,10 @@ function ComponentsTab({ liveInventory, userRole }) {
                                         <div key={bItemIdx} className="flex justify-between items-center p-1.5 border rounded" style={{ borderColor: C.border, background: "rgba(0,0,0,0.3)" }}>
                                           <span className="text-[11px] truncate pr-2" style={{ color: C.textDim, fontFamily: FONT.body }}>{bItem.name}</span>
                                           <div className="flex items-center gap-2 shrink-0">
-                                            <span className="font-mono text-[10px] px-1 bg-black/40 rounded" style={{ color: C.textFaint }}>Qty: {bItem.quantity || bItem.qty}</span>
+                                            <span className="font-mono text-[10px] px-1 bg-black/40 rounded" style={{ color: C.textFaint }}>
+                                              Qty: {bItem.quantity || bItem.qty}
+                                              {bItem.reqQty && bItem.reqQty !== (bItem.quantity || bItem.qty) ? ` / ${bItem.reqQty}` : ""}
+                                            </span>
                                             {isOwner && (
                                               <>
                                                 <button onClick={() => handleEditItem(loc, secIdx, boxIdx, bItemIdx, bItem)}><Pencil size={11} style={{ color: C.textFaint }} className="hover:text-white" /></button>

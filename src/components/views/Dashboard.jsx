@@ -4,23 +4,27 @@ import { C, FONT } from "../../theme";
 import { Card, Eyebrow, SectionHeader, Badge, ProgressBar, SprayStreak } from "../Primitives";
 
 export function Dashboard({ meetings = [], inventory = [], notices: _notices = [], tasks = { todo: [], progress: [], done: [], completed: [] }, expenses = [], profile = {}, userId, team = [] }) {
+  
+  // UPDATED: Now only flags an item if reqQty exists AND current qty < reqQty
   const getLowStockItems = () => {
     const lowItems = [];
     (inventory || []).forEach(loc => {
       (loc.sections || []).forEach(sec => {
         (sec.items || []).forEach(item => {
           const qty = parseInt(item.quantity || item.qty || "0", 10);
-          const lowThreshold = parseInt(item.low || "2", 10);
-          if (!isNaN(qty) && qty <= lowThreshold) {
-            lowItems.push({ id: item.name, name: item.name, qty: item.quantity || item.qty, location: loc.location });
+          const req = parseInt(item.reqQty, 10);
+          
+          if (!isNaN(qty) && !isNaN(req) && qty < req) {
+            lowItems.push({ id: item.name, name: item.name, qty: qty, req: req, location: loc.location });
           }
         });
         (sec.subBoxes || []).forEach(box => {
           (box.items || []).forEach(bItem => {
             const qty = parseInt(bItem.quantity || bItem.qty || "0", 10);
-            const lowThreshold = parseInt(bItem.low || "2", 10);
-            if (!isNaN(qty) && qty <= lowThreshold) {
-              lowItems.push({ id: bItem.name, name: bItem.name, qty: bItem.quantity || bItem.qty, location: `${loc.location} (${box.boxName})` });
+            const req = parseInt(bItem.reqQty, 10);
+
+            if (!isNaN(qty) && !isNaN(req) && qty < req) {
+              lowItems.push({ id: bItem.name, name: bItem.name, qty: qty, req: req, location: `${loc.location} (${box.boxName})` });
             }
           });
         });
@@ -40,7 +44,7 @@ export function Dashboard({ meetings = [], inventory = [], notices: _notices = [
     { label: "Active Builds", value: activeProjects, delta: activeProjects ? `${activeProjects} in progress` : "No active tracks", icon: KanbanIcon },
     { label: "Pending Tasks", value: pendingTasks, delta: `${pendingTasks} task${pendingTasks === 1 ? "" : "s"} remaining`, icon: Clock },
     { label: "Budget Used", value: `${budgetUsedPct}%`, delta: `of ₹${budget.toLocaleString()} cap`, icon: Wallet, danger: budgetUsedPct > 85 },
-    { label: "Low Stock Items", value: lowStock.length, delta: lowStock.length ? "needs reorder" : "fully stocked", icon: AlertTriangle, danger: lowStock.length > 0 },
+    { label: "Inventory Alerts", value: lowStock.length, delta: lowStock.length ? "Items missing from capacity" : "Everything is stocked", icon: AlertTriangle, danger: lowStock.length > 0 },
   ];
 
   const isOwner = profile.role === "Owner";
@@ -58,7 +62,6 @@ export function Dashboard({ meetings = [], inventory = [], notices: _notices = [
         </div>
       </div>
 
-      {/* Responsive 1 -> 2 -> 4 Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
         {stats.map((s, i) => (
           <Card key={i} pad="p-4" tag>
@@ -136,7 +139,7 @@ export function Dashboard({ meetings = [], inventory = [], notices: _notices = [
           </div>
           <div className="space-y-2 max-h-[200px] overflow-y-auto">
             {lowStock.length === 0 ? (
-              <p className="text-xs py-4 text-center" style={{ color: C.textFaint, fontFamily: FONT.body }}>All items are well stocked.</p>
+              <p className="text-xs py-4 text-center" style={{ color: C.textFaint, fontFamily: FONT.body }}>All registered items are at full capacity.</p>
             ) : (
               lowStock.map((item, idx) => (
                 <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2 px-2.5 py-2 text-xs" style={{ background: C.dangerSoft, border: `1px solid rgba(229,72,77,0.25)`, fontFamily: FONT.head }}>
@@ -144,7 +147,10 @@ export function Dashboard({ meetings = [], inventory = [], notices: _notices = [
                     <div className="truncate" style={{ color: C.text }}>{item.name}</div>
                     <div className="text-[9px] truncate" style={{ color: C.textFaint }}>{item.location}</div>
                   </div>
-                  <span className="shrink-0" style={{ color: C.danger, fontFamily: FONT.mono }}>{item.qty} left</span>
+                  {/* UPDATED BADGE FORMAT */}
+                  <span className="shrink-0" style={{ color: C.danger, fontFamily: FONT.mono }}>
+                    {item.qty} / {item.req} left
+                  </span>
                 </div>
               ))
             )}
@@ -156,7 +162,6 @@ export function Dashboard({ meetings = [], inventory = [], notices: _notices = [
         <Card className="relative overflow-hidden" tag>
           <SprayStreak size={160} opacity={0.03} style={{ top: -30, right: -20 }} />
           <Eyebrow>Your performance</Eyebrow>
-          {/* Responsive 2 -> 4 Grid */}
           <div className="relative grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
             <div className="border-t pt-3" style={{ borderColor: C.border }}>
               <CalendarCheck2 size={14} style={{ color: C.gold }} className="mb-2" />
