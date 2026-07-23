@@ -63,7 +63,6 @@ export default function SpinXWorkspace() {
     return () => unsubscribeAuth();
   }, []);
 
-  // Real-time Firestore Listeners
   useEffect(() => {
     if (!user) return;
 
@@ -109,7 +108,6 @@ export default function SpinXWorkspace() {
   const handleLogin = async () => { try { await signInWithPopup(auth, googleProvider); } catch (e) { console.error(e); } };
   const handleLogout = async () => { try { await signOut(auth); setActive("dashboard"); } catch (e) { console.error(e); } };
 
-  // Role-Based Navigation Filtering
   const allowedNav = (NAV || []).filter(n => {
     if (profile.role === "Owner" || profile.role === "Head Developer") return true;
     if (profile.role === "Developer" || profile.role === "Operations") return true;
@@ -125,8 +123,9 @@ export default function SpinXWorkspace() {
       case "notices": return <Notices liveNotices={notices} />;
       case "calendar": return <CalendarView liveEvents={calendarEvents} />;
       case "inventory": return <Inventory liveInventory={inventory} liveDocs={docs} />;
-      case "projects": return <Projects liveTasks={tasks} userRole={profile.role} userId={user.uid} allMembers={allUsers} />;
-      case "team": return <Team liveTeam={team} />;
+      // UPDATED PROPS FOR PROJECTS AND TEAM
+      case "projects": return <Projects liveTasks={tasks} liveTeams={team} profile={profile} userId={user?.uid} allMembers={allUsers} />;
+      case "team": return <Team liveTeams={team} allUsers={allUsers} profile={profile} userId={user?.uid} />;
       default: return <Dashboard meetings={meetings} inventory={inventory} notices={notices} tasks={tasks} profile={profile} userId={user?.uid} team={team} />;
     }
   };
@@ -240,10 +239,11 @@ export default function SpinXWorkspace() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6" style={{ background: C.bg }}>
+          {/* UPDATED TEAM RENDER WITH ACCESS CONTROLS IN THE COMPONENT ITSELF */}
           {active === "team" ? (
             <div>
-              <Team liveTeam={team} />
-
+              <Team liveTeams={team} allUsers={allUsers} profile={profile} userId={user?.uid} />
+              
               {["Owner", "Head Developer"].includes(profile.role) && (
                 <div className="mt-8">
                   <div className="flex items-center gap-2 mb-3">
@@ -291,7 +291,7 @@ export default function SpinXWorkspace() {
               )}
             </div>
           ) : (
-            active === "projects" ? <Projects liveTasks={tasks} userRole={profile.role} userId={user.uid} allMembers={allUsers} /> : renderSection()
+            renderSection()
           )}
         </div>
       </div>
