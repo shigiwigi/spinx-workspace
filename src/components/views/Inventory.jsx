@@ -47,152 +47,228 @@ function ComponentsTab({ liveInventory }) {
   const [showForm, setShowForm] = useState(false);
   const [qrItem, setQrItem] = useState(null);
   const [q, setQ] = useState("");
-  const [form, setForm] = useState({ name: "", qty: "", low: "", supplier: "" });
-  const [editId, setEditId] = useState(null);
-  const [editForm, setEditForm] = useState({});
+  
+  // States for adding a custom item to a selected location/section
+  const [targetLocationId, setTargetLocationId] = useState("");
+  const [targetSectionIdx, setTargetSectionIdx] = useState(0);
+  const [targetBoxIdx, setTargetBoxIdx] = useState("-1"); // -1 for direct items, >=0 for subBoxes
+  const [form, setForm] = useState({ name: "", qty: "" });
 
   const addItem = async () => {
-    if (!form.name.trim()) return;
-    await addDoc(collection(db, "inventory"), {
-      name: form.name,
-      qty: Number(form.qty) || 0,
-      low: Number(form.low) || 5,
-      supplier: form.supplier || "—",
-      date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      createdAt: new Date()
+    if (!form.name.trim() || !targetLocationId) return;
+
+    const locTarget = liveInventory.find(l => l.id === targetLocationId);
+    if (!locTarget) return;
+
+    const updatedSections = [...locTarget.sections];
+    const secIdx = Number(targetSectionIdx);
+    const boxIdx = Number(targetBoxIdx);
+
+    if (boxIdx === -1) {
+      // Add directly to section items
+      if (!updatedSections[secIdx].items) updatedSections[secIdx].items = [];
+      updatedSections[secIdx].items.push({
+        name: form.name.trim(),
+        quantity: form.qty.trim() || "1"
+      });
+    } else {
+      // Add to specific subBox
+      if (!updatedSections[secIdx].subBoxes[boxIdx].items) {
+        updatedSections[secIdx].subBoxes[boxIdx].items = [];
+      }
+      updatedSections[secIdx].subBoxes[boxIdx].items.push({
+        name: form.name.trim(),
+        quantity: form.qty.trim() || "1"
+      });
+    }
+
+    await updateDoc(doc(db, "inventory", targetLocationId), {
+      sections: updatedSections
     });
-    setForm({ name: "", qty: "", low: "", supplier: "" });
+
+    setForm({ name: "", qty: "" });
     setShowForm(false);
   };
 
-  const startEdit = (i) => {
-    setEditId(i.id);
-    setEditForm({ name: i.name, qty: i.qty, low: i.low, supplier: i.supplier });
-  };
-
-  const saveEdit = async (id) => {
-    await updateDoc(doc(db, "inventory", id), {
-      name: editForm.name,
-      qty: Number(editForm.qty) || 0,
-      low: Number(editForm.low) || 0,
-      supplier: editForm.supplier || "—",
-    });
-    setEditId(null);
-  };
-
-  const removeItem = async (id) => {
+  const removeItem = async (locationId, secIdx, boxIdx, itemIdx) => {
     if (!confirm("Delete this component from inventory?")) return;
-    await deleteDoc(doc(db, "inventory", id));
+
+    const locTarget = liveInventory.find(l => l.id === locationId);
+    if (!locTarget) return;
+
+    const updatedSections = [...locTarget.sections];
+    
+    if (boxIdx === -1) {
+      updatedSections[secIdx].items.splice(itemIdx, 1);
+    } else {
+      updatedSections[secIdx].subBoxes[boxIdx].items.splice(itemIdx, 1);
+    }
+
+    await updateDoc(doc(db, "inventory", locationId), {
+      sections: updatedSections
+    });
   };
 
-  const filtered = liveInventory.filter(i => i.name?.toLowerCase().includes(q.toLowerCase()));
+  const matchesSearch = (str) => str?.toLowerCase().includes(q.toLowerCase());
 
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
         <div className="flex items-center gap-2 px-3 py-2 border flex-1 max-w-sm" style={{ borderColor: C.border }}>
           <Search size={14} style={{ color: C.textFaint }} />
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search components..."
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search workspace components..."
             className="bg-transparent outline-none text-sm flex-1" style={{ color: C.text, fontFamily: FONT.body }} />
         </div>
-        <PrimaryBtn icon={Plus} onClick={() => setShowForm(!showForm)} small>Add item</PrimaryBtn>
+        <PrimaryBtn icon={Plus} onClick={() => {
+          if (liveInventory.length > 0 && !targetLocationId) {
+            setTargetLocationId(liveInventory[0].id);
+          }
+          setShowForm(!showForm);
+        }} small>Add item</PrimaryBtn>
       </div>
 
       {showForm && (
         <Card className="mb-4" tag>
-          <div className="grid grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <select
+              value={targetLocationId}
+              onChange={e => {
+                setTargetLocationId(e.target.value);
+                setTargetSectionIdx(0);
+                setTargetBoxIdx("-1");
+              }}
+              className="border px-3 py-2 text-sm outline-none" style={inputStyle}
+            >
+              {liveInventory.map(l => (
+                <option key={l.id} value={l.id} style={{ background: C.bgCard || "#111", color: C.text }}>
+                  {l.location}
+                </option>
+              ))}
+            </select>
+
+            {targetLocationId && (
+              <select
+                value={targetSectionIdx}
+                onChange={e => {
+                  setTargetSectionIdx(Number(e.target.value));
+                  setTargetBoxIdx("-1");
+                }}
+                className="border px-3 py-2 text-sm outline-none" style={inputStyle}
+              >
+                {liveInventory.find(l => l.id === targetLocationId)?.sections?.map((s, idx) => (
+                  <option key={idx} value={idx} style={{ background: C.bgCard || "#111", color: C.text }}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {targetLocationId && (
+              <select
+                value={targetBoxIdx}
+                onChange={e => setTargetBoxIdx(e.target.value)}
+                className="border px-3 py-2 text-sm outline-none" style={inputStyle}
+              >
+                <option value="-1" style={{ background: C.bgCard || "#111", color: C.text }}>Direct Section Item</option>
+                {liveInventory.find(l => l.id === targetLocationId)?.sections?.[targetSectionIdx]?.subBoxes?.map((b, idx) => (
+                  <option key={idx} value={idx} style={{ background: C.bgCard || "#111", color: C.text }}>
+                    📦 {b.boxName}
+                  </option>
+                ))}
+              </select>
+            )}
+
             <input placeholder="Component name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-              className="col-span-2 border px-3 py-2 text-sm outline-none" style={inputStyle} />
-            <input type="number" placeholder="Qty" value={form.qty} onChange={e => setForm({ ...form, qty: e.target.value })}
-              className="border px-3 py-2 text-sm outline-none" style={{ ...inputStyle, fontFamily: FONT.mono }} />
-            <input type="number" placeholder="Low-stock at" value={form.low} onChange={e => setForm({ ...form, low: e.target.value })}
-              className="border px-3 py-2 text-sm outline-none" style={{ ...inputStyle, fontFamily: FONT.mono }} />
-            <input placeholder="Supplier" value={form.supplier} onChange={e => setForm({ ...form, supplier: e.target.value })}
               className="border px-3 py-2 text-sm outline-none" style={inputStyle} />
+            
+            <input placeholder="Qty (e.g. 1, 10, Assorted)" value={form.qty} onChange={e => setForm({ ...form, qty: e.target.value })}
+              className="border px-3 py-2 text-sm outline-none" style={{ ...inputStyle, fontFamily: FONT.mono }} />
           </div>
-          <div className="mt-3"><PrimaryBtn onClick={addItem} icon={Check} small>Save item</PrimaryBtn></div>
+          <div className="mt-3 flex justify-end">
+            <PrimaryBtn onClick={addItem} icon={Check} small>Save item to Firestore</PrimaryBtn>
+          </div>
         </Card>
       )}
 
-      {filtered.length === 0 ? (
+      {liveInventory.length === 0 ? (
         <Card className="text-center py-16 text-sm">
           <Boxes size={30} className="mx-auto mb-2 opacity-40" style={{ color: C.gold }} />
           <div style={{ color: C.textDim, fontFamily: FONT.body }}>No items found in system inventory.</div>
         </Card>
       ) : (
-        <Card pad="p-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-                {["Component", "Quantity", "Low at", "Supplier", "Purchased", "Status", ""].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-[11px] uppercase tracking-wider font-medium" style={{ color: C.textFaint, fontFamily: FONT.head }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(i => {
-                const low = i.qty <= i.low;
-                const isEditing = editId === i.id;
-                return (
-                  <tr key={i.id} style={{ borderBottom: `1px solid ${C.border}` }}>
-                    {isEditing ? (
-                      <>
-                        <td className="px-4 py-2">
-                          <input value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })}
-                            className="w-full border px-2 py-1.5 text-sm outline-none" style={inputStyle} />
-                        </td>
-                        <td className="px-4 py-2">
-                          <input type="number" value={editForm.qty} onChange={e => setEditForm({ ...editForm, qty: e.target.value })}
-                            className="w-20 border px-2 py-1.5 text-sm outline-none" style={{ ...inputStyle, fontFamily: FONT.mono }} />
-                        </td>
-                        <td className="px-4 py-2">
-                          <input type="number" value={editForm.low} onChange={e => setEditForm({ ...editForm, low: e.target.value })}
-                            className="w-16 border px-2 py-1.5 text-sm outline-none" style={{ ...inputStyle, fontFamily: FONT.mono }} />
-                        </td>
-                        <td className="px-4 py-2">
-                          <input value={editForm.supplier} onChange={e => setEditForm({ ...editForm, supplier: e.target.value })}
-                            className="w-full border px-2 py-1.5 text-sm outline-none" style={inputStyle} />
-                        </td>
-                        <td className="px-4 py-3" style={{ color: C.textFaint, fontFamily: FONT.mono, fontSize: 12 }}>{i.date}</td>
-                        <td className="px-4 py-3">{low ? <Badge tone="danger">Low stock</Badge> : <Badge tone="success">In stock</Badge>}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <button onClick={() => saveEdit(i.id)}><Check size={16} style={{ color: C.success }} /></button>
-                            <button onClick={() => setEditId(null)}><X size={16} style={{ color: C.textFaint }} /></button>
-                          </div>
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="px-4 py-3" style={{ color: C.text, fontFamily: FONT.body }}>{i.name}</td>
-                        <td className="px-4 py-3" style={{ color: low ? C.danger : C.text, fontFamily: FONT.mono }}>{i.qty}</td>
-                        <td className="px-4 py-3" style={{ color: C.textFaint, fontFamily: FONT.mono }}>{i.low}</td>
-                        <td className="px-4 py-3" style={{ color: C.textDim, fontFamily: FONT.body, fontSize: 13 }}>{i.supplier}</td>
-                        <td className="px-4 py-3" style={{ color: C.textFaint, fontFamily: FONT.mono, fontSize: 12 }}>{i.date}</td>
-                        <td className="px-4 py-3">{low ? <Badge tone="danger">Low stock</Badge> : <Badge tone="success">In stock</Badge>}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2.5">
-                            <button onClick={() => setQrItem(qrItem === i.id ? null : i.id)}><QrCode size={15} style={{ color: C.textFaint }} /></button>
-                            <button onClick={() => startEdit(i)}><Pencil size={14} style={{ color: C.textFaint }} /></button>
-                            <button onClick={() => removeItem(i.id)}><Trash2 size={14} style={{ color: C.danger }} /></button>
-                          </div>
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Card>
+        <div className="space-y-6">
+          {liveInventory.map(loc => (
+            <Card key={loc.id} pad="p-5">
+              <h2 className="text-xl font-bold mb-4 pb-2 border-b" style={{ color: C.gold, borderColor: C.border, fontFamily: FONT.head }}>
+                📍 {loc.location}
+              </h2>
+
+              <div className="space-y-5">
+                {loc.sections?.map((sec, secIdx) => {
+                  const filteredItems = (sec.items || []).filter(i => !q || matchesSearch(i.name));
+                  const hasSubBoxes = sec.subBoxes && sec.subBoxes.length > 0;
+
+                  return (
+                    <div key={secIdx} className="p-3 border rounded" style={{ borderColor: C.border, background: "rgba(255,255,255,0.01)" }}>
+                      <h3 className="text-sm font-semibold mb-3" style={{ color: C.text, fontFamily: FONT.head }}>
+                        {sec.name}
+                      </h3>
+
+                      {filteredItems.length > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 mb-3">
+                          {filteredItems.map((item, itemIdx) => (
+                            <div key={itemIdx} className="flex justify-between items-center p-2 border rounded text-xs" style={{ borderColor: C.border, background: "rgba(255,255,255,0.02)" }}>
+                              <span style={{ color: C.text, fontFamily: FONT.body }}>{item.name}</span>
+                              <div className="flex items-center gap-2">
+                                <Badge>{item.quantity}</Badge>
+                                <button onClick={() => setQrItem(`${loc.id}-${secIdx}-${itemIdx}`)}><QrCode size={13} style={{ color: C.textFaint }} /></button>
+                                <button onClick={() => removeItem(loc.id, secIdx, -1, itemIdx)}><Trash2 size={13} style={{ color: C.danger }} /></button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {hasSubBoxes && (
+                        <div className="space-y-3 mt-3">
+                          {sec.subBoxes.map((box, boxIdx) => {
+                            const filteredBoxItems = (box.items || []).filter(i => !q || matchesSearch(i.name));
+                            if (q && filteredBoxItems.length === 0) return null;
+
+                            return (
+                              <div key={boxIdx} className="pl-3 border-l-2 my-2" style={{ borderColor: C.goldLine }}>
+                                <h4 className="text-xs font-semibold mb-2" style={{ color: C.gold, fontFamily: FONT.head }}>📦 {box.boxName}</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                  {filteredBoxItems.map((bItem, bItemIdx) => (
+                                    <div key={bItemIdx} className="flex justify-between items-center p-1.5 border rounded text-[11px]" style={{ borderColor: C.border, background: "rgba(0,0,0,0.2)" }}>
+                                      <span style={{ color: C.textDim, fontFamily: FONT.body }}>{bItem.name}</span>
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-mono text-[10px]" style={{ color: C.textFaint }}>x{bItem.quantity}</span>
+                                        <button onClick={() => removeItem(loc.id, secIdx, boxIdx, bItemIdx)}><Trash2 size={12} style={{ color: C.danger }} /></button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          ))}
+        </div>
       )}
 
       {qrItem && (
         <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "#000000CC" }} onClick={() => setQrItem(null)}>
           <Card pad="p-6" className="text-center" style={{ width: 220 }} tag>
             <div className="mx-auto mb-3" style={{ width: 140, height: 140, background: "repeating-conic-gradient(#F2F1EC 0% 25%, #0A0A0B 0% 50%) 0 0/20px 20px", border: `1px solid ${C.border}` }} />
-            <div className="text-xs" style={{ color: C.text, fontFamily: FONT.mono }}>{liveInventory.find(i => i.id === qrItem)?.name}</div>
-            <div className="text-[10px] mt-1" style={{ color: C.textFaint }}>SPINX-INV-{qrItem}</div>
+            <div className="text-xs" style={{ color: C.text, fontFamily: FONT.mono }}>SPINX-ITEM</div>
+            <div className="text-[10px] mt-1" style={{ color: C.textFaint }}>{qrItem}</div>
           </Card>
         </div>
       )}
@@ -201,7 +277,7 @@ function ComponentsTab({ liveInventory }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* DOCUMENTATION TAB (folded into Inventory)                          */
+/* DOCUMENTATION TAB                                                  */
 /* ------------------------------------------------------------------ */
 function DocsTab({ liveDocs }) {
   const [open, setOpen] = useState([]);
