@@ -6,6 +6,7 @@ import { db, auth, googleProvider } from "./firebase";
 import { C, FONT, useFonts } from "./theme";
 import { Avatar, LogoMark, PrimaryBtn, Badge, Card, SprayStreak } from "./components/Primitives";
 import { NAV } from "./data";
+import { seedDatabase } from "./seed";
 
 import { Dashboard } from "./components/views/Dashboard";
 import { Meetings } from "./components/views/Meetings";
@@ -63,9 +64,14 @@ export default function SpinXWorkspace() {
     return () => unsubscribeAuth();
   }, []);
 
+  // Firestore Listeners & Database Seeding
   useEffect(() => {
     if (!user) return;
 
+    // 1. One-time trigger to seed hierarchical inventory data to Firestore
+    seedDatabase();
+
+    // 2. Real-time Listeners
     const unsubUsers = onSnapshot(collection(db, "users"), (s) => {
       setAllUsers(s.docs.map(d => ({ id: d.id, ...d.data() })));
     });
