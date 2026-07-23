@@ -123,7 +123,7 @@ export default function SpinXWorkspace() {
       case "meetings": return <Meetings liveMeetings={meetings} />;
       case "notices": return <Notices liveNotices={notices} />;
       case "calendar": return <CalendarView liveEvents={calendarEvents} />;
-      case "inventory": return <Inventory liveInventory={inventory} liveDocs={docs} />;
+      case "inventory": return <Inventory liveInventory={inventory} liveDocs={docs} userRole={profile.role} />;
       case "projects": return <Projects liveTasks={tasks} liveTeams={team} userRole={profile.role} userId={user?.uid} profile={profile} allMembers={allUsers} />;
       case "team": return <Team liveTeams={team} allUsers={allUsers} profile={profile} userId={user?.uid} />;
       default: return <Dashboard meetings={meetings} inventory={inventory} notices={notices} tasks={tasks} profile={profile} userId={user?.uid} team={team} />;

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Check, Search, QrCode, Boxes, Pencil, Trash2, X, FileText, ChevronDown, ArrowUpRight, FolderPlus } from "lucide-react";
+import { Plus, Check, Search, Boxes, Pencil, Trash2, FileText, ChevronDown, ChevronUp, ArrowUpRight, FolderPlus, MapPin, PackagePlus } from "lucide-react";
 import { collection, addDoc, doc, updateDoc, deleteDoc, arrayUnion } from "firebase/firestore";
 import { db } from "../../firebase";
 import { C, FONT } from "../../theme";
@@ -7,7 +7,9 @@ import { Card, SectionHeader, Badge, PrimaryBtn, GhostBtn } from "../Primitives"
 
 const inputStyle = { borderColor: C.border, background: "transparent", color: C.text, fontFamily: FONT.body };
 
-export function Inventory({ liveInventory = [], liveDocs = [] }) {
+// Note: Pass `userRole={profile.role}` from App.jsx if you want strict owner editing, 
+// otherwise this checks if role is passed, defaulting to true for safety if missing.
+export function Inventory({ liveInventory = [], liveDocs = [], userRole = "Owner" }) {
   const [tab, setTab] = useState("components");
 
   return (
@@ -35,7 +37,7 @@ export function Inventory({ liveInventory = [], liveDocs = [] }) {
         ))}
       </div>
 
-      {tab === "components" ? <ComponentsTab liveInventory={liveInventory} /> : <DocsTab liveDocs={liveDocs} />}
+      {tab === "components" ? <ComponentsTab liveInventory={liveInventory} userRole={userRole} /> : <DocsTab liveDocs={liveDocs} />}
     </div>
   );
 }
@@ -43,233 +45,253 @@ export function Inventory({ liveInventory = [], liveDocs = [] }) {
 /* ------------------------------------------------------------------ */
 /* COMPONENTS TAB                                                     */
 /* ------------------------------------------------------------------ */
-function ComponentsTab({ liveInventory }) {
-  const [showForm, setShowForm] = useState(false);
-  const [qrItem, setQrItem] = useState(null);
+function ComponentsTab({ liveInventory, userRole }) {
   const [q, setQ] = useState("");
-  
-  // States for adding a custom item to a selected location/section
-  const [targetLocationId, setTargetLocationId] = useState("");
-  const [targetSectionIdx, setTargetSectionIdx] = useState(0);
-  const [targetBoxIdx, setTargetBoxIdx] = useState("-1"); // -1 for direct items, >=0 for subBoxes
-  const [form, setForm] = useState({ name: "", qty: "" });
+  const [expandedLoc, setExpandedLoc] = useState(null);
 
-  const addItem = async () => {
-    if (!form.name.trim() || !targetLocationId) return;
+  const isOwner = userRole === "Owner" || userRole === "Head Developer";
 
-    const locTarget = liveInventory.find(l => l.id === targetLocationId);
-    if (!locTarget) return;
-
-    const updatedSections = [...locTarget.sections];
-    const secIdx = Number(targetSectionIdx);
-    const boxIdx = Number(targetBoxIdx);
-
-    if (boxIdx === -1) {
-      // Add directly to section items
-      if (!updatedSections[secIdx].items) updatedSections[secIdx].items = [];
-      updatedSections[secIdx].items.push({
-        name: form.name.trim(),
-        quantity: form.qty.trim() || "1"
-      });
-    } else {
-      // Add to specific subBox
-      if (!updatedSections[secIdx].subBoxes[boxIdx].items) {
-        updatedSections[secIdx].subBoxes[boxIdx].items = [];
-      }
-      updatedSections[secIdx].subBoxes[boxIdx].items.push({
-        name: form.name.trim(),
-        quantity: form.qty.trim() || "1"
-      });
-    }
-
-    await updateDoc(doc(db, "inventory", targetLocationId), {
-      sections: updatedSections
-    });
-
-    setForm({ name: "", qty: "" });
-    setShowForm(false);
-  };
-
-  const removeItem = async (locationId, secIdx, boxIdx, itemIdx) => {
-    if (!confirm("Delete this component from inventory?")) return;
-
-    const locTarget = liveInventory.find(l => l.id === locationId);
-    if (!locTarget) return;
-
-    const updatedSections = [...locTarget.sections];
-    
-    if (boxIdx === -1) {
-      updatedSections[secIdx].items.splice(itemIdx, 1);
-    } else {
-      updatedSections[secIdx].subBoxes[boxIdx].items.splice(itemIdx, 1);
-    }
-
-    await updateDoc(doc(db, "inventory", locationId), {
-      sections: updatedSections
-    });
-  };
-
+  // Reverses the list so it displays in natural seeded order instead of inverted
+  const sortedInventory = [...liveInventory].reverse();
   const matchesSearch = (str) => str?.toLowerCase().includes(q.toLowerCase());
+
+  // --- CORE FIRESTORE UPDATERS ---
+  const updateFirestore = async (locId, newSections) => {
+    await updateDoc(doc(db, "inventory", locId), { sections: newSections });
+  };
+
+  // --- ADDING NEW CATEGORIES / LOCATIONS ---
+  const handleAddLocation = async () => {
+    const locName = prompt("Enter new location name (e.g. Table 7, Storage Box A):");
+    if (!locName?.trim()) return;
+    await addDoc(collection(db, "inventory"), {
+      location: locName.trim(),
+      sections: [],
+      createdAt: new Date()
+    });
+  };
+
+  const handleAddSection = (loc) => {
+    const secName = prompt("Enter section name (e.g. Drawer, Top Shelf):");
+    if (!secName?.trim()) return;
+    const newSections = [...(loc.sections || [])];
+    newSections.push({ name: secName.trim(), items: [], subBoxes: [] });
+    updateFirestore(loc.id, newSections);
+  };
+
+  const handleAddContainer = (loc, secIdx) => {
+    const boxName = prompt("Enter container name (e.g. Grey Bag, Resistor Box):");
+    if (!boxName?.trim()) return;
+    const newSections = [...(loc.sections || [])];
+    if (!newSections[secIdx].subBoxes) newSections[secIdx].subBoxes = [];
+    newSections[secIdx].subBoxes.push({ boxName: boxName.trim(), items: [] });
+    updateFirestore(loc.id, newSections);
+  };
+
+  // --- ITEM MANAGEMENT ---
+  const handleAddItem = (loc, secIdx, boxIdx = -1) => {
+    const name = prompt("Item Name:");
+    if (!name?.trim()) return;
+    const qty = prompt("Quantity (e.g. 1, 10, Assorted):", "1");
+    if (qty === null) return;
+
+    const newSections = [...(loc.sections || [])];
+    if (boxIdx === -1) {
+      if (!newSections[secIdx].items) newSections[secIdx].items = [];
+      newSections[secIdx].items.push({ name: name.trim(), quantity: qty.trim() });
+    } else {
+      if (!newSections[secIdx].subBoxes[boxIdx].items) newSections[secIdx].subBoxes[boxIdx].items = [];
+      newSections[secIdx].subBoxes[boxIdx].items.push({ name: name.trim(), quantity: qty.trim() });
+    }
+    updateFirestore(loc.id, newSections);
+  };
+
+  const handleEditItem = (loc, secIdx, boxIdx, itemIdx, currentItem) => {
+    const newName = prompt("Update Name:", currentItem.name);
+    if (!newName?.trim()) return;
+    const newQty = prompt("Update Quantity:", currentItem.quantity || currentItem.qty);
+    if (newQty === null) return;
+
+    const newSections = [...loc.sections];
+    if (boxIdx === -1) {
+      newSections[secIdx].items[itemIdx] = { name: newName.trim(), quantity: newQty.trim() };
+    } else {
+      newSections[secIdx].subBoxes[boxIdx].items[itemIdx] = { name: newName.trim(), quantity: newQty.trim() };
+    }
+    updateFirestore(loc.id, newSections);
+  };
+
+  const handleDeleteItem = (loc, secIdx, boxIdx, itemIdx) => {
+    if (!confirm("Remove this item entirely?")) return;
+    const newSections = [...loc.sections];
+    if (boxIdx === -1) {
+      newSections[secIdx].items.splice(itemIdx, 1);
+    } else {
+      newSections[secIdx].subBoxes[boxIdx].items.splice(itemIdx, 1);
+    }
+    updateFirestore(loc.id, newSections);
+  };
+
+  const handleDeleteLocation = async (id) => {
+    if (!confirm("Are you sure you want to delete this entire location/category?")) return;
+    await deleteDoc(doc(db, "inventory", id));
+  };
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-4">
-        <div className="flex items-center gap-2 px-3 py-2 border flex-1 max-w-sm" style={{ borderColor: C.border }}>
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="flex items-center gap-2 px-3 py-2 border flex-1" style={{ borderColor: C.border }}>
           <Search size={14} style={{ color: C.textFaint }} />
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search workspace components..."
             className="bg-transparent outline-none text-sm flex-1" style={{ color: C.text, fontFamily: FONT.body }} />
         </div>
-        <PrimaryBtn icon={Plus} onClick={() => {
-          if (liveInventory.length > 0 && !targetLocationId) {
-            setTargetLocationId(liveInventory[0].id);
-          }
-          setShowForm(!showForm);
-        }} small>Add item</PrimaryBtn>
+        {isOwner && (
+          <PrimaryBtn icon={Plus} onClick={handleAddLocation} small>Add Location</PrimaryBtn>
+        )}
       </div>
 
-      {showForm && (
-        <Card className="mb-4" tag>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-            <select
-              value={targetLocationId}
-              onChange={e => {
-                setTargetLocationId(e.target.value);
-                setTargetSectionIdx(0);
-                setTargetBoxIdx("-1");
-              }}
-              className="border px-3 py-2 text-sm outline-none" style={inputStyle}
-            >
-              {liveInventory.map(l => (
-                <option key={l.id} value={l.id} style={{ background: C.bgCard || "#111", color: C.text }}>
-                  {l.location}
-                </option>
-              ))}
-            </select>
-
-            {targetLocationId && (
-              <select
-                value={targetSectionIdx}
-                onChange={e => {
-                  setTargetSectionIdx(Number(e.target.value));
-                  setTargetBoxIdx("-1");
-                }}
-                className="border px-3 py-2 text-sm outline-none" style={inputStyle}
-              >
-                {liveInventory.find(l => l.id === targetLocationId)?.sections?.map((s, idx) => (
-                  <option key={idx} value={idx} style={{ background: C.bgCard || "#111", color: C.text }}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            {targetLocationId && (
-              <select
-                value={targetBoxIdx}
-                onChange={e => setTargetBoxIdx(e.target.value)}
-                className="border px-3 py-2 text-sm outline-none" style={inputStyle}
-              >
-                <option value="-1" style={{ background: C.bgCard || "#111", color: C.text }}>Direct Section Item</option>
-                {liveInventory.find(l => l.id === targetLocationId)?.sections?.[targetSectionIdx]?.subBoxes?.map((b, idx) => (
-                  <option key={idx} value={idx} style={{ background: C.bgCard || "#111", color: C.text }}>
-                    📦 {b.boxName}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            <input placeholder="Component name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-              className="border px-3 py-2 text-sm outline-none" style={inputStyle} />
-            
-            <input placeholder="Qty (e.g. 1, 10, Assorted)" value={form.qty} onChange={e => setForm({ ...form, qty: e.target.value })}
-              className="border px-3 py-2 text-sm outline-none" style={{ ...inputStyle, fontFamily: FONT.mono }} />
-          </div>
-          <div className="mt-3 flex justify-end">
-            <PrimaryBtn onClick={addItem} icon={Check} small>Save item to Firestore</PrimaryBtn>
-          </div>
-        </Card>
-      )}
-
-      {liveInventory.length === 0 ? (
+      {sortedInventory.length === 0 ? (
         <Card className="text-center py-16 text-sm">
           <Boxes size={30} className="mx-auto mb-2 opacity-40" style={{ color: C.gold }} />
           <div style={{ color: C.textDim, fontFamily: FONT.body }}>No items found in system inventory.</div>
         </Card>
       ) : (
-        <div className="space-y-6">
-          {liveInventory.map(loc => (
-            <Card key={loc.id} pad="p-5">
-              <h2 className="text-xl font-bold mb-4 pb-2 border-b" style={{ color: C.gold, borderColor: C.border, fontFamily: FONT.head }}>
-                📍 {loc.location}
-              </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {sortedInventory.map(loc => {
+            const isExpanded = expandedLoc === loc.id || q; // Auto-expand if searching
+            
+            return (
+              <Card 
+                key={loc.id} 
+                pad="p-4" 
+                className={`transition-all duration-300 ${isExpanded ? "col-span-1 md:col-span-2 lg:col-span-3 border-yellow-700/50" : "cursor-pointer hover:border-slate-600"}`}
+                onClick={() => !isExpanded && setExpandedLoc(loc.id)}
+              >
+                {/* LOCATION HEADER */}
+                <div 
+                  className="flex items-center justify-between" 
+                  onClick={() => isExpanded && !q && setExpandedLoc(null)}
+                  style={{ cursor: isExpanded && !q ? "pointer" : "default" }}
+                >
+                  <div className="flex items-center gap-2">
+                    <MapPin size={16} style={{ color: isExpanded ? C.gold : C.textFaint }} />
+                    <h2 className="text-lg font-bold tracking-wide" style={{ color: isExpanded ? C.gold : C.text, fontFamily: FONT.head }}>
+                      {loc.location}
+                    </h2>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {isExpanded && isOwner && (
+                      <button onClick={(e) => { e.stopPropagation(); handleDeleteLocation(loc.id); }}>
+                        <Trash2 size={14} style={{ color: C.danger }} />
+                      </button>
+                    )}
+                    {isExpanded ? <ChevronUp size={16} style={{ color: C.textFaint }} /> : <ChevronDown size={16} style={{ color: C.textFaint }} />}
+                  </div>
+                </div>
 
-              <div className="space-y-5">
-                {loc.sections?.map((sec, secIdx) => {
-                  const filteredItems = (sec.items || []).filter(i => !q || matchesSearch(i.name));
-                  const hasSubBoxes = sec.subBoxes && sec.subBoxes.length > 0;
+                {/* EXPANDED CONTENT */}
+                {isExpanded && (
+                  <div className="mt-5 space-y-6 pt-4 border-t" style={{ borderColor: C.border }}>
+                    {isOwner && (
+                      <div className="flex justify-end">
+                        <GhostBtn icon={Plus} onClick={() => handleAddSection(loc)} small>Add Section</GhostBtn>
+                      </div>
+                    )}
 
-                  return (
-                    <div key={secIdx} className="p-3 border rounded" style={{ borderColor: C.border, background: "rgba(255,255,255,0.01)" }}>
-                      <h3 className="text-sm font-semibold mb-3" style={{ color: C.text, fontFamily: FONT.head }}>
-                        {sec.name}
-                      </h3>
+                    {(loc.sections || []).map((sec, secIdx) => {
+                      const filteredDirect = (sec.items || []).filter(i => !q || matchesSearch(i.name));
+                      const hasDirectItems = filteredDirect.length > 0;
+                      const hasSubBoxes = sec.subBoxes && sec.subBoxes.length > 0;
 
-                      {filteredItems.length > 0 && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 mb-3">
-                          {filteredItems.map((item, itemIdx) => (
-                            <div key={itemIdx} className="flex justify-between items-center p-2 border rounded text-xs" style={{ borderColor: C.border, background: "rgba(255,255,255,0.02)" }}>
-                              <span style={{ color: C.text, fontFamily: FONT.body }}>{item.name}</span>
-                              <div className="flex items-center gap-2">
-                                <Badge>{item.quantity}</Badge>
-                                <button onClick={() => setQrItem(`${loc.id}-${secIdx}-${itemIdx}`)}><QrCode size={13} style={{ color: C.textFaint }} /></button>
-                                <button onClick={() => removeItem(loc.id, secIdx, -1, itemIdx)}><Trash2 size={13} style={{ color: C.danger }} /></button>
+                      // Hide section if searching and no matches found inside it
+                      if (q && !hasDirectItems && !hasSubBoxes) return null; 
+
+                      return (
+                        <div key={secIdx} className="p-3 border rounded-lg bg-black/20" style={{ borderColor: C.border }}>
+                          
+                          {/* SECTION HEADER */}
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                            <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: C.text, fontFamily: FONT.head }}>
+                              {sec.name || "General"}
+                            </h3>
+                            {isOwner && (
+                              <div className="flex gap-2">
+                                <button onClick={() => handleAddContainer(loc, secIdx)} className="text-[10px] uppercase font-bold px-2 py-1 rounded border hover:bg-white/5 transition-colors" style={{ borderColor: C.border, color: C.textFaint }}>+ Container</button>
+                                <button onClick={() => handleAddItem(loc, secIdx, -1)} className="text-[10px] uppercase font-bold px-2 py-1 rounded border hover:bg-white/5 transition-colors" style={{ borderColor: C.border, color: C.gold }}>+ Item</button>
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                            )}
+                          </div>
 
-                      {hasSubBoxes && (
-                        <div className="space-y-3 mt-3">
-                          {sec.subBoxes.map((box, boxIdx) => {
-                            const filteredBoxItems = (box.items || []).filter(i => !q || matchesSearch(i.name));
-                            if (q && filteredBoxItems.length === 0) return null;
-
-                            return (
-                              <div key={boxIdx} className="pl-3 border-l-2 my-2" style={{ borderColor: C.goldLine }}>
-                                <h4 className="text-xs font-semibold mb-2" style={{ color: C.gold, fontFamily: FONT.head }}>📦 {box.boxName}</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                                  {filteredBoxItems.map((bItem, bItemIdx) => (
-                                    <div key={bItemIdx} className="flex justify-between items-center p-1.5 border rounded text-[11px]" style={{ borderColor: C.border, background: "rgba(0,0,0,0.2)" }}>
-                                      <span style={{ color: C.textDim, fontFamily: FONT.body }}>{bItem.name}</span>
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="font-mono text-[10px]" style={{ color: C.textFaint }}>x{bItem.quantity}</span>
-                                        <button onClick={() => removeItem(loc.id, secIdx, boxIdx, bItemIdx)}><Trash2 size={12} style={{ color: C.danger }} /></button>
-                                      </div>
-                                    </div>
-                                  ))}
+                          {/* DIRECT ITEMS */}
+                          {hasDirectItems && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
+                              {filteredDirect.map((item, itemIdx) => (
+                                <div key={itemIdx} className="flex justify-between items-center p-2 border rounded" style={{ borderColor: C.border, background: C.surface }}>
+                                  <span className="text-xs truncate font-medium pr-2" style={{ color: C.text, fontFamily: FONT.body }}>{item.name}</span>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <Badge>{item.quantity || item.qty}</Badge>
+                                    {isOwner && (
+                                      <>
+                                        <button onClick={() => handleEditItem(loc, secIdx, -1, itemIdx, item)}><Pencil size={12} style={{ color: C.textFaint }} className="hover:text-white" /></button>
+                                        <button onClick={() => handleDeleteItem(loc, secIdx, -1, itemIdx)}><Trash2 size={12} style={{ color: C.danger }} /></button>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
+                              ))}
+                            </div>
+                          )}
 
-      {qrItem && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "#000000CC" }} onClick={() => setQrItem(null)}>
-          <Card pad="p-6" className="text-center" style={{ width: 220 }} tag>
-            <div className="mx-auto mb-3" style={{ width: 140, height: 140, background: "repeating-conic-gradient(#F2F1EC 0% 25%, #0A0A0B 0% 50%) 0 0/20px 20px", border: `1px solid ${C.border}` }} />
-            <div className="text-xs" style={{ color: C.text, fontFamily: FONT.mono }}>SPINX-ITEM</div>
-            <div className="text-[10px] mt-1" style={{ color: C.textFaint }}>{qrItem}</div>
-          </Card>
+                          {/* SUB BOXES / CONTAINERS */}
+                          {hasSubBoxes && (
+                            <div className="space-y-4">
+                              {sec.subBoxes.map((box, boxIdx) => {
+                                const filteredBoxItems = (box.items || []).filter(i => !q || matchesSearch(i.name));
+                                if (q && filteredBoxItems.length === 0) return null;
+
+                                return (
+                                  <div key={boxIdx} className="pl-3 border-l-2" style={{ borderColor: C.goldLine }}>
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div className="flex items-center gap-1.5">
+                                        <PackagePlus size={14} style={{ color: C.gold }} />
+                                        <h4 className="text-xs font-bold" style={{ color: C.gold, fontFamily: FONT.head }}>{box.boxName}</h4>
+                                      </div>
+                                      {isOwner && (
+                                        <button onClick={() => handleAddItem(loc, secIdx, boxIdx)} className="text-[10px] uppercase font-bold text-slate-400 hover:text-white transition-colors">
+                                          + Add to container
+                                        </button>
+                                      )}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                      {filteredBoxItems.map((bItem, bItemIdx) => (
+                                        <div key={bItemIdx} className="flex justify-between items-center p-1.5 border rounded" style={{ borderColor: C.border, background: "rgba(0,0,0,0.3)" }}>
+                                          <span className="text-[11px] truncate pr-2" style={{ color: C.textDim, fontFamily: FONT.body }}>{bItem.name}</span>
+                                          <div className="flex items-center gap-2 shrink-0">
+                                            <span className="font-mono text-[10px] px-1 bg-black/40 rounded" style={{ color: C.textFaint }}>Qty: {bItem.quantity || bItem.qty}</span>
+                                            {isOwner && (
+                                              <>
+                                                <button onClick={() => handleEditItem(loc, secIdx, boxIdx, bItemIdx, bItem)}><Pencil size={11} style={{ color: C.textFaint }} className="hover:text-white" /></button>
+                                                <button onClick={() => handleDeleteItem(loc, secIdx, boxIdx, bItemIdx)}><Trash2 size={11} style={{ color: C.danger }} /></button>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
